@@ -17,15 +17,43 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 class GoogleDriveUploader:
-    """Sube archivos a Google Drive usando OAuth2 (tu cuenta personal)."""
+    """Sube archivos a Google Drive usando OAuth2 o Cuenta de Servicio."""
 
     def __init__(self, credentials_path: str, folder_id: str = ""):
         self.credentials_path = credentials_path
         self.folder_id = folder_id
         self._service = None
         self._authenticated = False
+        self.is_mock = False
 
     def authenticate(self) -> bool:
+        # 1. Intentar autenticación por Cuenta de Servicio si es ese tipo de JSON
+        is_service_account = False
+        try:
+            with open(self.credentials_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if data.get("type") == "service_account":
+                    is_service_account = True
+        except Exception:
+            pass
+
+        if is_service_account:
+            try:
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+                
+                creds = service_account.Credentials.from_service_account_file(
+                    self.credentials_path, scopes=SCOPES
+                )
+                self._service = build("drive", "v3", credentials=creds)
+                self._authenticated = True
+                logger.info("✅ Autenticado con Cuenta de Servicio de Google Drive")
+                return True
+            except Exception as e:
+                logger.error(f"Error conectando con Cuenta de Servicio: {e}")
+                return False
+
+        # 2. Flujo de OAuth2 Personal si no es cuenta de servicio
         try:
             from google.oauth2.credentials import Credentials
             from google_auth_oauthlib.flow import InstalledAppFlow
@@ -147,6 +175,9 @@ class GoogleDriveUploader:
 
 class MockDriveUploader:
     """Uploader simulado para pruebas sin Drive."""
+
+    def __init__(self):
+        self.is_mock = True
 
     def authenticate(self) -> bool:
         return True

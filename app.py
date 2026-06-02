@@ -296,7 +296,6 @@ def get_step_class(s):
 c1_num, c1_lbl = get_step_class(1)
 c2_num, c2_lbl = get_step_class(2)
 c3_num, c3_lbl = get_step_class(3)
-c4_num, c4_lbl = get_step_class(4)
 
 st.markdown(f"""
 <div class="step-container">
@@ -312,12 +311,7 @@ st.markdown(f"""
     <div class="step-arrow">➔</div>
     <div class="step-bubble">
         <div class="{c3_num}">3</div>
-        <div class="{c3_lbl}">3. Google Drive</div>
-    </div>
-    <div class="step-arrow">➔</div>
-    <div class="step-bubble">
-        <div class="{c4_num}">4</div>
-        <div class="{c4_lbl}">4. Generar Boletines</div>
+        <div class="{c3_lbl}">3. Generar Boletines</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -456,70 +450,13 @@ elif step == 2:
                 st.session_state.current_step = 1
                 st.experimental_rerun()
         with col2:
-            if st.button("➡️ Siguiente Paso: Configurar Google Drive", use_container_width=True):
+            if st.button("➡️ Siguiente Paso: Subir PowerPoint y Generar", use_container_width=True):
                 st.session_state.current_step = 3
                 st.experimental_rerun()
 
 
-# --- PASO 3: GOOGLE DRIVE ---
+# --- PASO 3: SUBIR BOLETINES Y GENERAR ---
 elif step == 3:
-    st.markdown("### 3️⃣ Paso 3: Conectar a Google Drive (Opcional)")
-    st.markdown("Si deseas subir automáticamente los PDFs a Google Drive y enlazar los códigos QR a esos PDFs, configura tus datos aquí.")
-    st.markdown("💡 *Si prefieres no usar Google Drive, simplemente no configures nada en esta sección y presiona el botón de 'Siguiente Paso'. Los boletines se generarán igual para que los descargues en un solo ZIP.*")
-    
-    st.markdown("---")
-    
-    # Mostrar estado de credenciales guardadas
-    if os.path.exists(SAVED_CREDS_PATH) or (st.session_state.google_credentials_path == SAVED_CREDS_PATH):
-        st.success("🟢 Conectado exitosamente: Las credenciales ya están guardadas de forma segura en el servidor.")
-    else:
-        st.info("🟡 Sin conexión: No hay credenciales de Drive guardadas todavía.")
-        
-    uploaded_creds_main = st.file_uploader(
-        "Subir archivo JSON de credenciales de Google Drive (Reemplazar/Configurar)",
-        type=["json"],
-        key="main_drive_creds_uploader"
-    )
-    
-    if uploaded_creds_main:
-        try:
-            with open(SAVED_CREDS_PATH, "wb") as f:
-                f.write(uploaded_creds_main.read())
-            st.session_state.google_credentials_path = SAVED_CREDS_PATH
-            st.success("¡Credenciales de Google Drive guardadas con éxito en el servidor!")
-        except Exception as e:
-            st.error(f"Error al guardar credenciales: {e}")
-            
-    drive_folder_id = st.text_input(
-        "Folder ID de Google Drive (Pega aquí la clave de tu carpeta de Drive)",
-        value=st.session_state.drive_folder_id_val
-    )
-    
-    if drive_folder_id != st.session_state.drive_folder_id_val:
-        st.session_state.drive_folder_id_val = drive_folder_id
-        try:
-            with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
-                f.write(drive_folder_id)
-        except Exception:
-            pass
-            
-    if st.session_state.drive_folder_id_val:
-        st.info(f"📁 Carpeta vinculada ID: `{st.session_state.drive_folder_id_val}`")
-
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬅️ Paso Anterior (Diseñar)", use_container_width=True):
-            st.session_state.current_step = 2
-            st.experimental_rerun()
-    with col2:
-        if st.button("➡️ Siguiente Paso: Subir PowerPoint y Generar", use_container_width=True):
-            st.session_state.current_step = 4
-            st.experimental_rerun()
-
-
-# --- PASO 4: SUBIR BOLETINES Y GENERAR ---
-elif step == 4:
     if st.session_state.processed_zip_data is not None:
         st.markdown("### 🎉 ¡Procesamiento Completado con Éxito!")
         st.markdown("Los boletines han sido generados y los códigos QR fueron insertados y vinculados correctamente.")
@@ -660,10 +597,13 @@ elif step == 4:
                             st.session_state.drive_folder_id_val,
                             mock=not bool(st.session_state.google_credentials_path)
                         )
-                        if st.session_state.google_credentials_path:
-                            add_log("☁️ Conectado exitosamente a Google Drive.")
+                        if getattr(uploader, "is_mock", True):
+                            if st.session_state.google_credentials_path:
+                                add_log("❌ Error de autenticación con Google Drive. Usando modo simulado (los enlaces QR serán ficticios).")
+                            else:
+                                add_log("ℹ️ No se cargaron credenciales de Drive. Los archivos se descargarán directamente en un archivo ZIP (enlaces QR simulados).")
                         else:
-                            add_log("ℹ️ No se cargaron credenciales de Drive. Los archivos se descargarán directamente en un archivo ZIP.")
+                            add_log("☁️ Conectado exitosamente a Google Drive y listo para subir PDFs.")
                         
                         total = len(students)
                         success_count = 0
@@ -783,7 +723,49 @@ elif step == 4:
             # Limpieza de temporales al finalizar si no se inició el procesamiento
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+            # Sección opcional de Google Drive colapsada al final
+            st.markdown("---")
+            with st.expander("☁️ Configuración de Google Drive (Opcional / Auto)", expanded=False):
+                st.markdown("Si deseas que los boletines PDF se suban automáticamente a tu Google Drive para que los códigos QR funcionen en internet, revisa tu conexión aquí:")
+                
+                # Mostrar estado de credenciales guardadas
+                if os.path.exists(SAVED_CREDS_PATH) or (st.session_state.google_credentials_path == SAVED_CREDS_PATH):
+                    st.success("🟢 Conectado exitosamente: Las credenciales ya están guardadas de forma segura.")
+                else:
+                    st.info("🟡 Sin conexión: Los archivos se descargarán de forma local en un ZIP pero no se subirán a Drive.")
+                    
+                uploaded_creds_main = st.file_uploader(
+                    "Subir archivo JSON de credenciales de Google Drive (Reemplazar/Configurar)",
+                    type=["json"],
+                    key="main_drive_creds_uploader"
+                )
+                
+                if uploaded_creds_main:
+                    try:
+                        with open(SAVED_CREDS_PATH, "wb") as f:
+                            f.write(uploaded_creds_main.read())
+                        st.session_state.google_credentials_path = SAVED_CREDS_PATH
+                        st.success("¡Credenciales de Google Drive guardadas con éxito!")
+                    except Exception as e:
+                        st.error(f"Error al guardar credenciales: {e}")
+                        
+                drive_folder_id = st.text_input(
+                    "Folder ID de Google Drive (Carpeta de destino)",
+                    value=st.session_state.drive_folder_id_val
+                )
+                
+                if drive_folder_id != st.session_state.drive_folder_id_val:
+                    st.session_state.drive_folder_id_val = drive_folder_id
+                    try:
+                        with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
+                            f.write(drive_folder_id)
+                    except Exception:
+                        pass
+                        
+                if st.session_state.drive_folder_id_val:
+                    st.info(f"📁 Carpeta vinculada ID: `{st.session_state.drive_folder_id_val}`")
+
         st.markdown("---")
-        if st.button("⬅️ Paso Anterior (Google Drive)", use_container_width=True):
-            st.session_state.current_step = 3
+        if st.button("⬅️ Paso Anterior (Diseñar)", use_container_width=True):
+            st.session_state.current_step = 2
             st.experimental_rerun()
