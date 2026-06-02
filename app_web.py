@@ -194,8 +194,8 @@ st.sidebar.markdown("### 🎨 Personalizar Diseño")
 
 # Estilo de Letra (Nombre)
 with st.sidebar.expander("👤 Estilo del Nombre", expanded=True):
-    font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman"])
-    font_size = st.slider("Tamaño de letra", min_value=12, max_value=72, value=36)
+    font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman", "Brittany Signature"])
+    font_size = st.slider("Tamaño de letra", min_value=10, max_value=250, value=80)
     font_bold = st.checkbox("Texto en Negrita (Bold)", value=True)
     font_color = st.color_picker("Color de letra", value="#000000")
     font_align = st.selectbox("Alineación", ["center", "left", "right"])
@@ -320,32 +320,69 @@ st.markdown(f"""
 
 # --- PASO 1: SUBIR PLANTILLA ---
 if step == 1:
-    st.markdown("### 1️⃣ Paso 1: Subir la Imagen de la Plantilla")
-    st.markdown("Sube la imagen que servirá de fondo para todos tus boletines. Debe ser una imagen en formato JPG o PNG.")
+    st.markdown("### 1️⃣ Paso 1: Configurar la Plantilla de Fondo")
+    st.markdown("Sube la imagen que servirá de fondo para tus boletines, o selecciona la plantilla guardada anteriormente.")
     
-    uploaded_template_main = st.file_uploader(
-        "Haz clic o arrastra aquí tu imagen de plantilla",
-        type=["jpg", "png", "jpeg"],
-        key="main_template_uploader"
-    )
-    
-    if uploaded_template_main:
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        tfile.write(uploaded_template_main.read())
-        tfile.close()
-        st.session_state.template_path = tfile.name
-        st.session_state.template_image = Image.open(tfile.name)
+    if os.path.exists(SAVED_TEMPLATE_PATH):
+        opcion_plantilla = st.radio(
+            "Selecciona una opción para tu plantilla:",
+            ["Usar la plantilla guardada anteriormente", "Subir una nueva plantilla"],
+            key="template_option_radio"
+        )
+    else:
+        opcion_plantilla = "Subir una nueva plantilla"
+        
+    if opcion_plantilla == "Usar la plantilla guardada anteriormente":
+        st.session_state.template_path = SAVED_TEMPLATE_PATH
+        try:
+            st.session_state.template_image = Image.open(SAVED_TEMPLATE_PATH)
+            st.session_state.template_image.load()
+        except Exception:
+            st.error("Error al cargar la plantilla guardada. Por favor sube una nueva.")
+            opcion_plantilla = "Subir una nueva plantilla"
+            
+    if opcion_plantilla == "Subir una nueva plantilla":
+        uploaded_template_main = st.file_uploader(
+            "Haz clic o arrastra aquí tu imagen de plantilla",
+            type=["jpg", "png", "jpeg"],
+            key="main_template_uploader"
+        )
+        
+        if uploaded_template_main:
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            tfile.write(uploaded_template_main.read())
+            tfile.close()
+            st.session_state.template_path = tfile.name
+            st.session_state.template_image = Image.open(tfile.name)
+            
+            # Guardar copia permanente en el servidor
+            try:
+                shutil.copy(tfile.name, SAVED_TEMPLATE_PATH)
+                st.session_state.has_saved_template = True
+            except Exception:
+                pass
         
     if st.session_state.template_image:
-        st.success("🟢 ¡Plantilla cargada con éxito!")
+        st.success("🟢 ¡Plantilla lista para usar!")
         st.image(st.session_state.template_image, caption="Tu plantilla de fondo", use_column_width=True)
         
         st.markdown("---")
-        if st.button("➡️ Siguiente Paso: Ubicar Elementos con el Mouse", use_container_width=True):
-            st.session_state.current_step = 2
-            st.rerun()
+        if opcion_plantilla == "Usar la plantilla guardada anteriormente":
+            col_skip1, col_skip2 = st.columns(2)
+            with col_skip1:
+                if st.button("🚀 Ir Directo a Generar Boletines (Paso 3)", use_container_width=True, type="primary"):
+                    st.session_state.current_step = 3
+                    st.rerun()
+            with col_skip2:
+                if st.button("✏️ Ajustar Diseño y Posición (Paso 2)", use_container_width=True):
+                    st.session_state.current_step = 2
+                    st.rerun()
+        else:
+            if st.button("➡️ Siguiente Paso: Ubicar Elementos con el Mouse", use_container_width=True):
+                st.session_state.current_step = 2
+                st.rerun()
     else:
-        st.info("💡 Sube una imagen en la caja de arriba para poder continuar al siguiente paso.")
+        st.info("💡 Por favor, configura una plantilla para poder continuar al siguiente paso.")
 
 
 # --- PASO 2: DISEÑAR POSICIONES ---
@@ -372,10 +409,10 @@ elif step == 2:
             "objects": [
                 {
                     "type": "rect",
-                    "left": float(100 / scale),
-                    "top": float(100 / scale),
-                    "width": float(400 / scale),
-                    "height": float(70 / scale),
+                    "left": float(st.session_state.name_x / scale),
+                    "top": float(st.session_state.name_y / scale),
+                    "width": float(st.session_state.name_w / scale),
+                    "height": float(st.session_state.name_h / scale),
                     "fill": "rgba(0, 169, 157, 0.35)",
                     "stroke": "#00A99D",
                     "strokeWidth": 2,
@@ -387,10 +424,10 @@ elif step == 2:
                 },
                 {
                     "type": "rect",
-                    "left": float(100 / scale),
-                    "top": float(200 / scale),
-                    "width": float(200 / scale),
-                    "height": float(200 / scale),
+                    "left": float(st.session_state.qr_x / scale),
+                    "top": float(st.session_state.qr_y / scale),
+                    "width": float(st.session_state.qr_w / scale),
+                    "height": float(st.session_state.qr_h / scale),
                     "fill": "rgba(247, 148, 29, 0.35)",
                     "stroke": "#F7941D",
                     "strokeWidth": 2,
@@ -441,6 +478,17 @@ elif step == 2:
                 st.session_state.qr_y = qy
                 st.session_state.qr_w = qw
                 st.session_state.qr_h = qh
+
+                # Guardar coordenadas en archivo permanente
+                try:
+                    import json
+                    with open(SAVED_COORDS_PATH, "w", encoding="utf-8") as f:
+                        json.dump({
+                            "name_x": nx, "name_y": ny, "name_w": nw, "name_h": nh,
+                            "qr_x": qx, "qr_y": qy, "qr_w": qw, "qr_h": qh
+                        }, f)
+                except Exception:
+                    pass
 
         st.markdown("---")
         col1, col2 = st.columns(2)

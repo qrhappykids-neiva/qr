@@ -114,10 +114,27 @@ def _insert_name(
 def _load_font(family: str, size: int, bold: bool) -> ImageFont.FreeTypeFont:
     """Carga una fuente TrueType, con fallback inteligente a fuentes Unicode del sistema."""
     # Carpetas de fuentes (sistema y de usuario local)
-    font_dirs = [r"C:\Windows\Fonts"]
-    local_appdata = os.environ.get("LOCALAPPDATA")
-    if local_appdata:
-        font_dirs.append(os.path.join(local_appdata, r"Microsoft\Windows\Fonts"))
+    if os.name == 'nt':
+        font_dirs = [r"C:\Windows\Fonts"]
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            font_dirs.append(os.path.join(local_appdata, r"Microsoft\Windows\Fonts"))
+    else:
+        font_dirs = [
+            os.path.expanduser("~/.fonts"),
+            "/usr/share/fonts",
+            "/usr/share/fonts/truetype",
+            "/usr/local/share/fonts"
+        ]
+
+    # Prepend local project font directories
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_font_dirs = [
+        base_dir,
+        os.path.join(base_dir, "brittany_font"),
+        os.path.join(base_dir, "fonts")
+    ]
+    font_dirs = local_font_dirs + font_dirs
 
     # Intentar búsqueda inteligente: buscar cualquier archivo de fuente que contenga el nombre de la familia
     family_clean = family.replace(" ", "").lower()
@@ -171,8 +188,20 @@ def _load_font(family: str, size: int, bold: bool) -> ImageFont.FreeTypeFont:
                 except Exception:
                     pass
 
-    # Último recurso absoluto: fuente por defecto de Pillow
-    logger.warning(f"Fuente '{family}' no encontrada. Usando fuente por defecto de Pillow.")
+    # Último recurso absoluto: buscar cualquier archivo .ttf local en el proyecto (ej. BrittanySignature)
+    for folder in local_font_dirs:
+        if os.path.exists(folder):
+            try:
+                for filename in os.listdir(folder):
+                    if filename.lower().endswith(".ttf"):
+                        path = os.path.join(folder, filename)
+                        logger.info(f"Usando fuente local de respaldo escalable: {path}")
+                        return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+
+    # Si todo falla, usar el default (no escalable, pero evita caída del programa)
+    logger.warning(f"Fuente '{family}' no encontrada y no hay fuentes locales válidas. Usando fuente por defecto de Pillow.")
     return ImageFont.load_default()
 
 
