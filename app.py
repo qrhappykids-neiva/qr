@@ -6,6 +6,7 @@ import zipfile
 import traceback
 import streamlit as st
 from PIL import Image
+from streamlit_drawable_canvas import st_canvas
 
 # Asegurar que el directorio raíz esté en el path de Python
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -96,6 +97,17 @@ if "template_path" not in st.session_state:
 if "google_credentials_path" not in st.session_state:
     st.session_state.google_credentials_path = ""
 
+# Inicializar coordenadas en session_state para enlace bidireccional
+if "name_x" not in st.session_state: st.session_state.name_x = 100
+if "name_y" not in st.session_state: st.session_state.name_y = 1000
+if "name_w" not in st.session_state: st.session_state.name_w = 800
+if "name_h" not in st.session_state: st.session_state.name_h = 120
+
+if "qr_x" not in st.session_state: st.session_state.qr_x = 100
+if "qr_y" not in st.session_state: st.session_state.qr_y = 100
+if "qr_w" not in st.session_state: st.session_state.qr_w = 250
+if "qr_h" not in st.session_state: st.session_state.qr_h = 250
+
 
 # --- HEADER Y LOGO ---
 col_logo, col_title = st.columns([1, 6])
@@ -134,10 +146,10 @@ st.sidebar.markdown("#### 📍 Posicionamiento de Elementos")
 
 # Caja de Nombre
 with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
-    name_x = st.number_input("X (Posición horizontal)", value=100, step=10)
-    name_y = st.number_input("Y (Posición vertical)", value=1000, step=10)
-    name_w = st.number_input("Ancho de la caja", value=800, step=10)
-    name_h = st.number_input("Alto de la caja", value=120, step=10)
+    name_x = st.sidebar.number_input("X (Posición horizontal)", step=10, key="name_x")
+    name_y = st.sidebar.number_input("Y (Posición vertical)", step=10, key="name_y")
+    name_w = st.sidebar.number_input("Ancho de la caja", step=10, key="name_w")
+    name_h = st.sidebar.number_input("Alto de la caja", step=10, key="name_h")
 
     st.markdown("**Estilo de Texto**")
     font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman"])
@@ -148,10 +160,10 @@ with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
 
 # Caja de QR
 with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
-    qr_x = st.number_input("X (Posición QR)", value=100, step=10)
-    qr_y = st.number_input("Y (Posición QR)", value=100, step=10)
-    qr_w = st.number_input("Ancho QR", value=250, step=10)
-    qr_h = st.number_input("Alto QR", value=250, step=10)
+    qr_x = st.sidebar.number_input("X (Posición QR)", step=10, key="qr_x")
+    qr_y = st.sidebar.number_input("Y (Posición QR)", step=10, key="qr_y")
+    qr_w = st.sidebar.number_input("Ancho QR", step=10, key="qr_w")
+    qr_h = st.sidebar.number_input("Alto QR", step=10, key="qr_h")
     qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
 
 # 3. Google Drive (Opcional)
@@ -172,43 +184,116 @@ tab_preview, tab_process = st.tabs(["👁️ Previsualización y Diseño", "🚀
 
 # PESTAÑA 1: PREVISUALIZACIÓN Y DISEÑO
 with tab_preview:
-    st.markdown("### Previsualización Interactiva de la Plantilla")
+    st.markdown("### 🎨 Posicionamiento Interactivo con el Mouse")
     
     if st.session_state.template_image:
-        st.markdown("Ajusta los valores en el panel lateral. Verás una muestra en tiempo real de cómo quedará el nombre y el código QR.")
+        col_canvas, col_preview = st.columns([1, 1])
         
-        # Generar QR de prueba
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_qr:
-            generate_qr("https://github.com", tmp_qr.name, size=800, error_correction=qr_ecc[0])
+        with col_canvas:
+            st.markdown("#### 1. Dibuja sobre la plantilla para posicionar")
             
-            # Componer previsualización en alta definición
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_preview:
-                compose_bulletin(
-                    template_path=st.session_state.template_path,
-                    output_path=tmp_preview.name,
-                    student_name="DULCE MARÍA MONTOYA SIERRA",
-                    qr_path=tmp_qr.name,
-                    name_box={"x": name_x, "y": name_y, "width": name_w, "height": name_h},
-                    qr_box={"x": qr_x, "y": qr_y, "width": qr_w, "height": qr_h},
-                    text_config={
-                        "font_family": font_family,
-                        "font_size": font_size,
-                        "font_bold": font_bold,
-                        "color": font_color,
-                        "align": font_align
-                    },
-                    dpi=300
-                )
+            # Selector de qué elemento dibujar
+            active_target = st.radio(
+                "🎯 Selecciona qué elemento deseas posicionar dibujando en la plantilla:",
+                ["👤 Caja del Nombre del Estudiante", "📲 Caja del Código QR"],
+                horizontal=True
+            )
+            
+            img = st.session_state.template_image
+            orig_w, orig_h = img.size
+            
+            # Escalar el canvas a un ancho de pantalla razonable (ej. 500px) manteniendo aspecto
+            canvas_width = 500
+            canvas_height = int(orig_h * (canvas_width / orig_w))
+            
+            st.markdown("<small>✨ Haz clic y arrastra con el mouse para dibujar el rectángulo donde irá el elemento seleccionado.</small>", unsafe_allow_html=True)
+            
+            # Renderizar el lienzo de dibujo
+            canvas_result = st_canvas(
+                fill_color="rgba(0, 169, 157, 0.25)" if "Nombre" in active_target else "rgba(247, 148, 29, 0.25)",
+                stroke_width=2,
+                stroke_color="#00A99D" if "Nombre" in active_target else "#F7941D",
+                background_image=img,
+                update_streamlit=True,
+                width=canvas_width,
+                height=canvas_height,
+                drawing_mode="rect",
+                key="canvas_designer",
+            )
+            
+            # Procesar el rectángulo dibujado
+            if canvas_result.json_data is not None:
+                objects = canvas_result.json_data.get("objects", [])
+                if objects:
+                    last_rect = objects[-1]
+                    if last_rect.get("type") == "rect":
+                        scale = orig_w / canvas_width
+                        x = int(last_rect["left"] * scale)
+                        y = int(last_rect["top"] * scale)
+                        w = int(last_rect["width"] * scale)
+                        h = int(last_rect["height"] * scale)
+                        
+                        # Actualizar session_state
+                        if "Nombre" in active_target:
+                            st.session_state.name_x = x
+                            st.session_state.name_y = y
+                            st.session_state.name_w = w
+                            st.session_state.name_h = h
+                        else:
+                            st.session_state.qr_x = x
+                            st.session_state.qr_y = y
+                            st.session_state.qr_w = w
+                            st.session_state.qr_h = h
+                            
+                        # Forzar actualización en Streamlit
+                        st.experimental_rerun()
+        
+        with col_preview:
+            st.markdown("#### 2. Previsualización del Boletín de Muestra")
+            st.markdown("<small>Esta es una muestra final con resolución de impresión (300 DPI) para validar la calidad.</small>", unsafe_allow_html=True)
+            
+            # Generar QR de prueba
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_qr:
+                generate_qr("https://github.com", tmp_qr.name, size=800, error_correction=qr_ecc[0])
                 
-                # Cargar y mostrar la imagen compuesta
-                preview_img = Image.open(tmp_preview.name)
-                st.image(preview_img, caption="Previsualización del boletín con datos de muestra", use_column_width=True)
-                
-            os.unlink(tmp_qr.name)
-            os.unlink(tmp_preview.name)
+                # Componer previsualización en alta definición
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_preview:
+                    compose_bulletin(
+                        template_path=st.session_state.template_path,
+                        output_path=tmp_preview.name,
+                        student_name="DULCE MARÍA MONTOYA SIERRA",
+                        qr_path=tmp_qr.name,
+                        name_box={
+                            "x": st.session_state.name_x,
+                            "y": st.session_state.name_y,
+                            "width": st.session_state.name_w,
+                            "height": st.session_state.name_h
+                        },
+                        qr_box={
+                            "x": st.session_state.qr_x,
+                            "y": st.session_state.qr_y,
+                            "width": st.session_state.qr_w,
+                            "height": st.session_state.qr_h
+                        },
+                        text_config={
+                            "font_family": font_family,
+                            "font_size": font_size,
+                            "font_bold": font_bold,
+                            "color": font_color,
+                            "align": font_align
+                        },
+                        dpi=300
+                    )
+                    
+                    # Mostrar la imagen de alta definición
+                    preview_img = Image.open(tmp_preview.name)
+                    st.image(preview_img, caption="Previsualización de Impresión", use_column_width=True)
+                    
+                os.unlink(tmp_qr.name)
+                os.unlink(tmp_preview.name)
             
     else:
-        st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder ajustar el diseño visualmente.")
+        st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder diseñar y arrastrar con el mouse.")
 
 
 # PESTAÑA 2: PROCESAMIENTO EN LOTE
