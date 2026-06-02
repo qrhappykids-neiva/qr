@@ -30,11 +30,16 @@ class GoogleDriveUploader:
     def authenticate(self) -> bool:
         # 1. Intentar autenticación por Cuenta de Servicio si es ese tipo de JSON
         is_service_account = False
+        is_token_json = False
+        token_data = None
         try:
             with open(self.credentials_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data.get("type") == "service_account":
                     is_service_account = True
+                elif "token" in data or "refresh_token" in data:
+                    is_token_json = True
+                    token_data = data
         except Exception:
             pass
 
@@ -52,6 +57,27 @@ class GoogleDriveUploader:
                 return True
             except Exception as e:
                 logger.error(f"Error conectando con Cuenta de Servicio: {e}")
+                return False
+
+        if is_token_json and token_data:
+            try:
+                from google.oauth2.credentials import Credentials
+                from googleapiclient.discovery import build
+                from google.auth.transport.requests import Request
+                
+                creds = Credentials.from_authorized_user_info(token_data, scopes=SCOPES)
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                    # Guardar el token refrescado en el mismo archivo
+                    with open(self.credentials_path, "w", encoding="utf-8") as f:
+                        f.write(creds.to_json())
+                
+                self._service = build("drive", "v3", credentials=creds)
+                self._authenticated = True
+                logger.info("✅ Autenticado con Token de Usuario Directo (Personal)")
+                return True
+            except Exception as e:
+                logger.error(f"Error conectando con Token de Usuario: {e}")
                 return False
 
         # 2. Flujo de OAuth2 Personal si no es cuenta de servicio
