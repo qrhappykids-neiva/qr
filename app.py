@@ -104,8 +104,8 @@ if "template_path" not in st.session_state:
 
 # Cargar automáticamente credenciales de Google Drive si ya existen guardadas o están en st.secrets
 if "google_credentials_path" not in st.session_state:
-    if "GOOGLE_DRIVE_CREDENTIALS" in st.secrets:
-        try:
+    try:
+        if "GOOGLE_DRIVE_CREDENTIALS" in st.secrets:
             import json
             creds_data = st.secrets["GOOGLE_DRIVE_CREDENTIALS"]
             if isinstance(creds_data, str):
@@ -115,8 +115,8 @@ if "google_credentials_path" not in st.session_state:
             with open(SAVED_CREDS_PATH, "w", encoding="utf-8") as f:
                 json.dump(creds_dict, f, indent=4)
             st.session_state.google_credentials_path = SAVED_CREDS_PATH
-        except Exception:
-            pass
+    except Exception:
+        pass
 
 if "google_credentials_path" not in st.session_state:
     if os.path.exists(SAVED_CREDS_PATH):
@@ -125,7 +125,7 @@ if "google_credentials_path" not in st.session_state:
         # Buscar en la carpeta local un archivo que empiece con client_secret y termine en .json
         try:
             local_secrets = [f for f in os.listdir(os.path.dirname(os.path.abspath(__file__))) 
-                             if f.startswith("client_secret") and f.endswith(".json")]
+                              if f.startswith("client_secret") and f.endswith(".json")]
             if local_secrets:
                 shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), local_secrets[0]), SAVED_CREDS_PATH)
                 st.session_state.google_credentials_path = SAVED_CREDS_PATH
@@ -136,17 +136,24 @@ if "google_credentials_path" not in st.session_state:
 
 # Cargar automáticamente el Folder ID de Google Drive si ya existe guardado (con fallback por defecto o st.secrets)
 if "drive_folder_id_val" not in st.session_state:
-    if "GOOGLE_DRIVE_FOLDER_ID" in st.secrets:
-        st.session_state.drive_folder_id_val = st.secrets["GOOGLE_DRIVE_FOLDER_ID"]
-    elif os.path.exists(SAVED_FOLDER_ID_PATH):
-        try:
-            with open(SAVED_FOLDER_ID_PATH, "r", encoding="utf-8") as f:
-                val = f.read().strip()
-                st.session_state.drive_folder_id_val = val if val else "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
-        except Exception:
+    loaded_folder_id = False
+    try:
+        if "GOOGLE_DRIVE_FOLDER_ID" in st.secrets:
+            st.session_state.drive_folder_id_val = st.secrets["GOOGLE_DRIVE_FOLDER_ID"]
+            loaded_folder_id = True
+    except Exception:
+        pass
+
+    if not loaded_folder_id:
+        if os.path.exists(SAVED_FOLDER_ID_PATH):
+            try:
+                with open(SAVED_FOLDER_ID_PATH, "r", encoding="utf-8") as f:
+                    val = f.read().strip()
+                    st.session_state.drive_folder_id_val = val if val else "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
+            except Exception:
+                st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
+        else:
             st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
-    else:
-        st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
 
 # Inicializar coordenadas en session_state con valores por defecto tipo escritorio
 if "name_x" not in st.session_state: st.session_state.name_x = 100
