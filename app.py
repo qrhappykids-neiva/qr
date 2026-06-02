@@ -200,38 +200,39 @@ with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
     qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
 
 # 3. Google Drive (Opcional)
-with st.sidebar.expander("☁️ Conectar a Google Drive (Opcional)", expanded=False):
-    st.markdown("<small>Los datos se guardarán en el servidor para que solo los configures una vez.</small>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ☁️ Google Drive (Opcional)")
+st.sidebar.markdown("<small>Los datos se guardarán en el servidor para que solo los configures una vez.</small>", unsafe_allow_html=True)
+
+# Mostrar estado de credenciales guardadas
+if os.path.exists(SAVED_CREDS_PATH):
+    st.sidebar.success("🟢 Credenciales guardadas en el servidor")
+else:
+    st.sidebar.info("🟡 Sin credenciales guardadas")
     
-    # Mostrar estado de credenciales guardadas
-    if os.path.exists(SAVED_CREDS_PATH):
-        st.success("🟢 Credenciales guardadas en el servidor")
-    else:
-        st.info("🟡 Sin credenciales guardadas")
+uploaded_creds = st.sidebar.file_uploader("Subir Archivo JSON de Credenciales (Reemplazar)", type=["json"])
+
+if uploaded_creds:
+    try:
+        # Guardar el archivo JSON de manera permanente en el servidor
+        with open(SAVED_CREDS_PATH, "wb") as f:
+            f.write(uploaded_creds.read())
+        st.session_state.google_credentials_path = SAVED_CREDS_PATH
+        st.sidebar.success("¡Credenciales guardadas con éxito!")
+        st.experimental_rerun()
+    except Exception as e:
+        st.sidebar.error(f"Error al guardar credenciales: {e}")
         
-    uploaded_creds = st.file_uploader("Subir Archivo JSON de Credenciales (Reemplazar)", type=["json"])
-    
-    if uploaded_creds:
-        try:
-            # Guardar el archivo JSON de manera permanente en el servidor
-            with open(SAVED_CREDS_PATH, "wb") as f:
-                f.write(uploaded_creds.read())
-            st.session_state.google_credentials_path = SAVED_CREDS_PATH
-            st.success("¡Credenciales guardadas con éxito!")
-            st.experimental_rerun()
-        except Exception as e:
-            st.error(f"Error al guardar credenciales: {e}")
-            
-    drive_folder_id = st.text_input("Folder ID de Google Drive", value=st.session_state.drive_folder_id_val)
-    
-    # Guardar permanentemente el Folder ID si ha cambiado
-    if drive_folder_id != st.session_state.drive_folder_id_val:
-        st.session_state.drive_folder_id_val = drive_folder_id
-        try:
-            with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
-                f.write(drive_folder_id)
-        except Exception:
-            pass
+drive_folder_id = st.sidebar.text_input("Folder ID de Google Drive", value=st.session_state.drive_folder_id_val)
+
+# Guardar permanentemente el Folder ID si ha cambiado
+if drive_folder_id != st.session_state.drive_folder_id_val:
+    st.session_state.drive_folder_id_val = drive_folder_id
+    try:
+        with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
+            f.write(drive_folder_id)
+    except Exception:
+        pass
 
 
 # --- PANEL PRINCIPAL: PESTAÑAS ---
