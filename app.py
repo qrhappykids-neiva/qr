@@ -348,6 +348,11 @@ with tab_preview:
 # PESTAÑA 2: PROCESAMIENTO EN LOTE
 with tab_process:
     st.markdown("### Procesar Presentaciones PowerPoint (.pptx)")
+    uploaded_files = st.file_uploader(
+        "Sube tus archivos PowerPoint (.pptx) o un archivo .zip que los contenga",
+        type=["pptx", "zip"],
+        accept_multiple_files=True
+    )
     
     if uploaded_files:
         st.markdown(f"**Archivos cargados:** {len(uploaded_files)}")
