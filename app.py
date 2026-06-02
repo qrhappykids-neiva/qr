@@ -205,7 +205,7 @@ st.sidebar.markdown("### ☁️ Google Drive (Opcional)")
 st.sidebar.markdown("<small>Los datos se guardarán en el servidor para que solo los configures una vez.</small>", unsafe_allow_html=True)
 
 # Mostrar estado de credenciales guardadas
-if os.path.exists(SAVED_CREDS_PATH):
+if os.path.exists(SAVED_CREDS_PATH) or (st.session_state.google_credentials_path == SAVED_CREDS_PATH):
     st.sidebar.success("🟢 Credenciales guardadas en el servidor")
 else:
     st.sidebar.info("🟡 Sin credenciales guardadas")
@@ -219,7 +219,6 @@ if uploaded_creds:
             f.write(uploaded_creds.read())
         st.session_state.google_credentials_path = SAVED_CREDS_PATH
         st.sidebar.success("¡Credenciales guardadas con éxito!")
-        st.experimental_rerun()
     except Exception as e:
         st.sidebar.error(f"Error al guardar credenciales: {e}")
         
