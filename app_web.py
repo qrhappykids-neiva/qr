@@ -4,6 +4,8 @@ import tempfile
 import shutil
 import zipfile
 import traceback
+import io
+import base64
 import streamlit as st
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
@@ -510,10 +512,9 @@ with tab_process:
                                 },
                                 dpi=300
                             )
-                            if ok_png:
-                                add_log("  ✅ Boletín final PNG generado en alta resolución")
+                                                        add_log("  ✅ Boletín final PNG generado en alta resolución")
                                 success_count += 1
-                                results.append({"name": name, "png": png_path})
+                                results.append({"name": name, "png": png_path, "qr_link": qr_link})
                             else:
                                 add_log("  ❌ Error al componer imagen final")
                                 
@@ -546,14 +547,18 @@ with tab_process:
                         try:
                             img_data = Image.open(res["png"])
                             img_data.load()  # Forzar carga en memoria
-                            st.session_state.results_gallery.append({"name": res["name"], "img": img_data})
+                            st.session_state.results_gallery.append({
+                                "name": res["name"],
+                                "img": img_data,
+                                "qr_link": res.get("qr_link", "")
+                            })
                         except Exception:
                             pass
                             
         # Limpieza de temporales al finalizar
         shutil.rmtree(temp_dir, ignore_errors=True)
-
-    # Mostrar de forma permanente los resultados si ya han sido procesados
+ 
+     # Mostrar de forma permanente los resultados si ya han sido procesados
     if st.session_state.processed_zip_data is not None:
         st.markdown("---")
         st.markdown("### 📥 Descarga de Boletines Procesados")
@@ -564,10 +569,29 @@ with tab_process:
             mime="application/zip"
         )
         
-        # Mostrar galería de forma permanente
+        # Mostrar galería de forma permanente con enlaces clicables a los PDFs
         if st.session_state.results_gallery:
             st.markdown("### 🖼️ Galería de Resultados")
+            st.markdown("<small>💡 Haz clic sobre cualquier boletín para **abrir y verificar el PDF del código QR correspondiente** en una nueva pestaña.</small>", unsafe_allow_html=True)
             cols = st.columns(3)
             for i, res in enumerate(st.session_state.results_gallery):
                 with cols[i % 3]:
-                    st.image(res["img"], caption=res["name"], use_column_width=True)
+                    try:
+                        buffered = io.BytesIO()
+                        res["img"].save(buffered, format="PNG")
+                        img_str = base64.b64encode(buffered.getvalue()).decode()
+                        img_data_uri = f"data:image/png;base64,{img_str}"
+                        
+                        href_link = res.get("qr_link", "#")
+                        clickable_html = f"""
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <a href="{href_link}" target="_blank" title="Haz clic para abrir el PDF del código QR">
+                                <img src="{img_data_uri}" style="width:100%; border-radius: 10px; border: 2px solid #b2dfdc; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+                            </a>
+                            <p style="font-weight: bold; color: #00A99D; margin-top: 8px; margin-bottom: 0;">{res['name']}</p>
+                            <a href="{href_link}" target="_blank" style="font-size: 0.85rem; color: #F7941D; text-decoration: none; font-weight: bold;">🔗 Probar Enlace QR</a>
+                        </div>
+                        """
+                        st.markdown(clickable_html, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.image(res["img"], caption=res["name"], use_column_width=True)
