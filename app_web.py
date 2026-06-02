@@ -93,14 +93,28 @@ setup_custom_fonts()
 
 # Inicializar variables de estado
 # Rutas persistentes de configuración en el servidor
+# Rutas persistentes de configuración en el servidor
 SAVED_CREDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_credentials.json")
 SAVED_FOLDER_ID_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_folder_id.txt")
+SAVED_TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_saved_template.png")
+SAVED_COORDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_saved_coords.json")
 
-# Inicializar variables de estado
+# Cargar automáticamente plantilla guardada
 if "template_image" not in st.session_state:
-    st.session_state.template_image = None
-if "template_path" not in st.session_state:
-    st.session_state.template_path = ""
+    if os.path.exists(SAVED_TEMPLATE_PATH):
+        try:
+            st.session_state.template_path = SAVED_TEMPLATE_PATH
+            st.session_state.template_image = Image.open(SAVED_TEMPLATE_PATH)
+            st.session_state.template_image.load()
+            st.session_state.has_saved_template = True
+        except Exception:
+            st.session_state.template_image = None
+            st.session_state.template_path = ""
+            st.session_state.has_saved_template = False
+    else:
+        st.session_state.template_image = None
+        st.session_state.template_path = ""
+        st.session_state.has_saved_template = False
 
 # Cargar automáticamente credenciales de Google Drive si ya existen guardadas o están en st.secrets
 if "google_credentials_path" not in st.session_state:
@@ -155,16 +169,25 @@ if "drive_folder_id_val" not in st.session_state:
         else:
             st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
 
-# Inicializar coordenadas en session_state con valores por defecto tipo escritorio
-if "name_x" not in st.session_state: st.session_state.name_x = 100
-if "name_y" not in st.session_state: st.session_state.name_y = 100
-if "name_w" not in st.session_state: st.session_state.name_w = 400
-if "name_h" not in st.session_state: st.session_state.name_h = 70
+# Inicializar coordenadas en session_state con valores del archivo guardado o valores por defecto
+loaded_coords = {}
+if os.path.exists(SAVED_COORDS_PATH):
+    try:
+        import json
+        with open(SAVED_COORDS_PATH, "r", encoding="utf-8") as f:
+            loaded_coords = json.load(f)
+    except Exception:
+        pass
 
-if "qr_x" not in st.session_state: st.session_state.qr_x = 100
-if "qr_y" not in st.session_state: st.session_state.qr_y = 200
-if "qr_w" not in st.session_state: st.session_state.qr_w = 200
-if "qr_h" not in st.session_state: st.session_state.qr_h = 200
+if "name_x" not in st.session_state: st.session_state.name_x = loaded_coords.get("name_x", 100)
+if "name_y" not in st.session_state: st.session_state.name_y = loaded_coords.get("name_y", 100)
+if "name_w" not in st.session_state: st.session_state.name_w = loaded_coords.get("name_w", 400)
+if "name_h" not in st.session_state: st.session_state.name_h = loaded_coords.get("name_h", 70)
+
+if "qr_x" not in st.session_state: st.session_state.qr_x = loaded_coords.get("qr_x", 100)
+if "qr_y" not in st.session_state: st.session_state.qr_y = loaded_coords.get("qr_y", 200)
+if "qr_w" not in st.session_state: st.session_state.qr_w = loaded_coords.get("qr_w", 200)
+if "qr_h" not in st.session_state: st.session_state.qr_h = loaded_coords.get("qr_h", 200)
 
 # Variables de persistencia para descarga y galería en la web
 if "processed_zip_data" not in st.session_state:

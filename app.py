@@ -168,16 +168,25 @@ if "drive_folder_id_val" not in st.session_state:
         else:
             st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
 
-# Inicializar coordenadas en session_state con valores por defecto tipo escritorio
-if "name_x" not in st.session_state: st.session_state.name_x = 100
-if "name_y" not in st.session_state: st.session_state.name_y = 100
-if "name_w" not in st.session_state: st.session_state.name_w = 400
+# Inicializar coordenadas en session_state con valores del archivo guardado o valores por defecto
+loaded_coords = {}
+if os.path.exists(SAVED_COORDS_PATH):
+    try:
+        import json
+        with open(SAVED_COORDS_PATH, "r", encoding="utf-8") as f:
+            loaded_coords = json.load(f)
+    except Exception:
+        pass
+
+if "name_x" not in st.session_state: st.session_state.name_x = loaded_coords.get("name_x", 100)
+if "name_y" not in st.session_state: st.session_state.name_y = loaded_coords.get("name_y", 100)
+if "name_w" not in st.session_state: st.session_state.name_w = loaded_coords.get("name_w", 400)
 if "name_h" not in st.session_state: st.session_state.name_h = 70
 
-if "qr_x" not in st.session_state: st.session_state.qr_x = 100
-if "qr_y" not in st.session_state: st.session_state.qr_y = 200
-if "qr_w" not in st.session_state: st.session_state.qr_w = 200
-if "qr_h" not in st.session_state: st.session_state.qr_h = 200
+if "qr_x" not in st.session_state: st.session_state.qr_x = loaded_coords.get("qr_x", 100)
+if "qr_y" not in st.session_state: st.session_state.qr_y = loaded_coords.get("qr_y", 200)
+if "qr_w" not in st.session_state: st.session_state.qr_w = loaded_coords.get("qr_w", 200)
+if "qr_h" not in st.session_state: st.session_state.qr_h = loaded_coords.get("qr_h", 200)
 
 # Variables de persistencia para descarga y galería en la web
 if "processed_zip_data" not in st.session_state:
