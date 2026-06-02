@@ -173,16 +173,13 @@ st.sidebar.markdown("#### 📍 Posicionamiento de Elementos")
 
 # Caja de Nombre
 with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
-    name_x_val = st.number_input("X (Posición horizontal)", value=int(st.session_state.name_x), step=10)
-    name_y_val = st.number_input("Y (Posición vertical)", value=int(st.session_state.name_y), step=10)
-    name_w_val = st.number_input("Ancho de la caja", value=int(st.session_state.name_w), step=10)
-    name_h_val = st.number_input("Alto de la caja", value=int(st.session_state.name_h), step=10)
+    st.markdown("**📍 Posición y Dimensiones:**")
+    st.markdown(f"* **Posición X:** `{st.session_state.name_x} px` \n* **Posición Y:** `{st.session_state.name_y} px` \n* **Ancho:** `{st.session_state.name_w} px` \n* **Alto:** `{st.session_state.name_h} px` (Ajustables con el mouse)")
     
-    # Asignar manualmente para evitar error de clave inmutable de Streamlit
-    st.session_state.name_x = name_x_val
-    st.session_state.name_y = name_y_val
-    st.session_state.name_w = name_w_val
-    st.session_state.name_h = name_h_val
+    name_x = st.session_state.name_x
+    name_y = st.session_state.name_y
+    name_w = st.session_state.name_w
+    name_h = st.session_state.name_h
 
     st.markdown("**Estilo de Texto**")
     font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman"])
@@ -193,17 +190,14 @@ with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
 
 # Caja de QR
 with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
-    qr_x_val = st.number_input("X (Posición QR)", value=int(st.session_state.qr_x), step=10)
-    qr_y_val = st.number_input("Y (Posición QR)", value=int(st.session_state.qr_y), step=10)
-    qr_w_val = st.number_input("Ancho QR", value=int(st.session_state.qr_w), step=10)
-    qr_h_val = st.number_input("Alto QR", value=int(st.session_state.qr_h), step=10)
-    qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
+    st.markdown("**📍 Posición y Dimensiones:**")
+    st.markdown(f"* **Posición X:** `{st.session_state.qr_x} px` \n* **Posición Y:** `{st.session_state.qr_y} px` \n* **Ancho:** `{st.session_state.qr_w} px` \n* **Alto:** `{st.session_state.qr_h} px` (Ajustables con el mouse)")
     
-    # Asignar manualmente
-    st.session_state.qr_x = qr_x_val
-    st.session_state.qr_y = qr_y_val
-    st.session_state.qr_w = qr_w_val
-    st.session_state.qr_h = qr_h_val
+    qr_x = st.session_state.qr_x
+    qr_y = st.session_state.qr_y
+    qr_w = st.session_state.qr_w
+    qr_h = st.session_state.qr_h
+    qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
 
 # 3. Google Drive (Opcional)
 with st.sidebar.expander("☁️ Conectar a Google Drive (Opcional)", expanded=False):
@@ -258,16 +252,16 @@ with tab_preview:
         canvas_height = int(orig_h * (canvas_width / orig_w))
         scale = orig_w / canvas_width
         
-        # Construir dibujo inicial de Fabric.js con las cajas NOMBRE y QR
+        # Construir dibujo inicial de Fabric.js con las cajas NOMBRE y QR estáticas (evita snap-back al actualizar de forma interactiva)
         initial_drawing = {
             "version": "4.4.0",
             "objects": [
                 {
                     "type": "rect",
-                    "left": float(st.session_state.name_x / scale),
-                    "top": float(st.session_state.name_y / scale),
-                    "width": float(st.session_state.name_w / scale),
-                    "height": float(st.session_state.name_h / scale),
+                    "left": float(100 / scale),
+                    "top": float(100 / scale),
+                    "width": float(400 / scale),
+                    "height": float(70 / scale),
                     "fill": "rgba(0, 169, 157, 0.35)",  # Teal semitransparente
                     "stroke": "#00A99D",
                     "strokeWidth": 2,
@@ -279,10 +273,10 @@ with tab_preview:
                 },
                 {
                     "type": "rect",
-                    "left": float(st.session_state.qr_x / scale),
-                    "top": float(st.session_state.qr_y / scale),
-                    "width": float(st.session_state.qr_w / scale),
-                    "height": float(st.session_state.qr_h / scale),
+                    "left": float(100 / scale),
+                    "top": float(200 / scale),
+                    "width": float(200 / scale),
+                    "height": float(200 / scale),
                     "fill": "rgba(247, 148, 29, 0.35)",  # Naranja semitransparente
                     "stroke": "#F7941D",
                     "strokeWidth": 2,
@@ -330,23 +324,16 @@ with tab_preview:
                 nx, ny, nw, nh = get_scaled_coords(obj_name)
                 qx, qy, qw, qh = get_scaled_coords(obj_qr)
                 
-                # Evitar bucles infinitos actualizando solo ante cambios reales
-                if (nx != st.session_state.name_x or ny != st.session_state.name_y or 
-                    nw != st.session_state.name_w or nh != st.session_state.name_h or
-                    qx != st.session_state.qr_x or qy != st.session_state.qr_y or
-                    qw != st.session_state.qr_w or qh != st.session_state.qr_h):
-                    
-                    st.session_state.name_x = nx
-                    st.session_state.name_y = ny
-                    st.session_state.name_w = nw
-                    st.session_state.name_h = nh
-                    
-                    st.session_state.qr_x = qx
-                    st.session_state.qr_y = qy
-                    st.session_state.qr_w = qw
-                    st.session_state.qr_h = qh
-                    
-                    st.experimental_rerun()
+                # Guardar las nuevas coordenadas en st.session_state (se actualizarán en la barra lateral sin necesidad de st.experimental_rerun)
+                st.session_state.name_x = nx
+                st.session_state.name_y = ny
+                st.session_state.name_w = nw
+                st.session_state.name_h = nh
+                
+                st.session_state.qr_x = qx
+                st.session_state.qr_y = qy
+                st.session_state.qr_w = qw
+                st.session_state.qr_h = qh
             
     else:
         st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder posicionar y arrastrar las cajas de Nombre y QR con tu mouse.")
