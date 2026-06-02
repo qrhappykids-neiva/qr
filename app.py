@@ -136,6 +136,8 @@ if "processed_zip_data" not in st.session_state:
     st.session_state.processed_zip_data = None
 if "results_gallery" not in st.session_state:
     st.session_state.results_gallery = []
+if "current_step" not in st.session_state:
+    st.session_state.current_step = 1
 
 
 # --- HEADER Y LOGO ---
@@ -152,113 +154,191 @@ with col_title:
     st.markdown("<div class='subtitle'>Generador Automático de Boletines Escolares en la Nube</div>", unsafe_allow_html=True)
 
 
-# --- LATERAL: CONFIGURACIÓN ---
-st.sidebar.markdown("### ⚙️ Configuración General")
+# --- LATERAL: PERSONALIZACIÓN DE ESTILOS ---
+st.sidebar.markdown("### 🎨 Personalizar Diseño")
 
-# 1. Cargar Plantilla
-uploaded_template = st.sidebar.file_uploader(
-    "1. Subir Imagen Plantilla (JPG/PNG)",
-    type=["jpg", "png", "jpeg"],
-    key="template_uploader"
-)
-
-if uploaded_template:
-    # Guardar en archivo temporal para poder ser leída por Pillow y Core
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    tfile.write(uploaded_template.read())
-    tfile.close()
-    st.session_state.template_path = tfile.name
-    st.session_state.template_image = Image.open(tfile.name)
-
-# 2. Configurar Coordenadas y Textos
-st.sidebar.markdown("#### 📍 Posicionamiento de Elementos")
-
-# Caja de Nombre
-with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
-    st.markdown("**📍 Posición y Dimensiones:**")
-    st.markdown(f"* **Posición X:** `{st.session_state.name_x} px` \n* **Posición Y:** `{st.session_state.name_y} px` \n* **Ancho:** `{st.session_state.name_w} px` \n* **Alto:** `{st.session_state.name_h} px` (Ajustables con el mouse)")
-    
-    name_x = st.session_state.name_x
-    name_y = st.session_state.name_y
-    name_w = st.session_state.name_w
-    name_h = st.session_state.name_h
-
-    st.markdown("**Estilo de Texto**")
+# Estilo de Letra (Nombre)
+with st.sidebar.expander("👤 Estilo del Nombre", expanded=True):
     font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman"])
     font_size = st.slider("Tamaño de letra", min_value=12, max_value=72, value=36)
     font_bold = st.checkbox("Texto en Negrita (Bold)", value=True)
     font_color = st.color_picker("Color de letra", value="#000000")
     font_align = st.selectbox("Alineación", ["center", "left", "right"])
 
-# Caja de QR
-with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
-    st.markdown("**📍 Posición y Dimensiones:**")
-    st.markdown(f"* **Posición X:** `{st.session_state.qr_x} px` \n* **Posición Y:** `{st.session_state.qr_y} px` \n* **Ancho:** `{st.session_state.qr_w} px` \n* **Alto:** `{st.session_state.qr_h} px` (Ajustables con el mouse)")
-    
-    qr_x = st.session_state.qr_x
-    qr_y = st.session_state.qr_y
-    qr_w = st.session_state.qr_w
-    qr_h = st.session_state.qr_h
+# Ajustes de QR
+with st.sidebar.expander("📲 Configuración de QR", expanded=False):
     qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
-
-# 3. Google Drive (Opcional)
-st.sidebar.markdown("---")
-st.sidebar.markdown("### ☁️ Google Drive (Opcional)")
-st.sidebar.markdown("<small>Los datos se guardarán en el servidor para que solo los configures una vez.</small>", unsafe_allow_html=True)
-
-# Mostrar estado de credenciales guardadas
-if os.path.exists(SAVED_CREDS_PATH) or (st.session_state.google_credentials_path == SAVED_CREDS_PATH):
-    st.sidebar.success("🟢 Credenciales guardadas en el servidor")
-else:
-    st.sidebar.info("🟡 Sin credenciales guardadas")
     
-uploaded_creds = st.sidebar.file_uploader("Subir Archivo JSON de Credenciales (Reemplazar)", type=["json"])
+# Mostrar coordenadas informativas del Nombre
+name_x = st.session_state.name_x
+name_y = st.session_state.name_y
+name_w = st.session_state.name_w
+name_h = st.session_state.name_h
 
-if uploaded_creds:
-    try:
-        # Guardar el archivo JSON de manera permanente en el servidor
-        with open(SAVED_CREDS_PATH, "wb") as f:
-            f.write(uploaded_creds.read())
-        st.session_state.google_credentials_path = SAVED_CREDS_PATH
-        st.sidebar.success("¡Credenciales guardadas con éxito!")
-    except Exception as e:
-        st.sidebar.error(f"Error al guardar credenciales: {e}")
+# Mostrar coordenadas informativas del QR
+qr_x = st.session_state.qr_x
+qr_y = st.session_state.qr_y
+qr_w = st.session_state.qr_w
+qr_h = st.session_state.qr_h
+
+
+# --- WIZARD PROGRESS BAR (INDICADOR DE PASOS) ---
+step = st.session_state.current_step
+
+st.markdown("""
+<style>
+.step-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f0fdfa;
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid #99f6e4;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.step-bubble {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    text-align: center;
+}
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+    transition: all 0.3s;
+}
+.step-active {
+    background-color: #00A99D;
+    color: white;
+    box-shadow: 0 0 10px rgba(0, 169, 157, 0.5);
+    transform: scale(1.15);
+}
+.step-pending {
+    background-color: #e2e8f0;
+    color: #64748b;
+}
+.step-completed {
+    background-color: #34d399;
+    color: white;
+}
+.step-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.step-label-active {
+    color: #00A99D;
+    font-weight: 800;
+}
+.step-label-pending {
+    color: #64748b;
+}
+.step-arrow {
+    font-size: 1.5rem;
+    color: #99f6e4;
+    user-select: none;
+    margin: 0 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Generar clases de estilo basadas en el paso actual
+def get_step_class(s):
+    if step == s: return "step-number step-active", "step-label step-label-active"
+    elif step > s: return "step-number step-completed", "step-label"
+    else: return "step-number step-pending", "step-label step-label-pending"
+
+c1_num, c1_lbl = get_step_class(1)
+c2_num, c2_lbl = get_step_class(2)
+c3_num, c3_lbl = get_step_class(3)
+c4_num, c4_lbl = get_step_class(4)
+
+st.markdown(f"""
+<div class="step-container">
+    <div class="step-bubble">
+        <div class="{c1_num}">1</div>
+        <div class="{c1_lbl}">1. Subir Plantilla</div>
+    </div>
+    <div class="step-arrow">➔</div>
+    <div class="step-bubble">
+        <div class="{c2_num}">2</div>
+        <div class="{c2_lbl}">2. Diseñar Caja/QR</div>
+    </div>
+    <div class="step-arrow">➔</div>
+    <div class="step-bubble">
+        <div class="{c3_num}">3</div>
+        <div class="{c3_lbl}">3. Google Drive</div>
+    </div>
+    <div class="step-arrow">➔</div>
+    <div class="step-bubble">
+        <div class="{c4_num}">4</div>
+        <div class="{c4_lbl}">4. Generar Boletines</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# --- LÓGICA DE CADA PASO ---
+
+# --- PASO 1: SUBIR PLANTILLA ---
+if step == 1:
+    st.markdown("### 1️⃣ Paso 1: Subir la Imagen de la Plantilla")
+    st.markdown("Sube la imagen que servirá de fondo para todos tus boletines. Debe ser una imagen en formato JPG o PNG.")
+    
+    uploaded_template_main = st.file_uploader(
+        "Haz clic o arrastra aquí tu imagen de plantilla",
+        type=["jpg", "png", "jpeg"],
+        key="main_template_uploader"
+    )
+    
+    if uploaded_template_main:
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tfile.write(uploaded_template_main.read())
+        tfile.close()
+        st.session_state.template_path = tfile.name
+        st.session_state.template_image = Image.open(tfile.name)
         
-drive_folder_id = st.sidebar.text_input("Folder ID de Google Drive", value=st.session_state.drive_folder_id_val)
-
-# Guardar permanentemente el Folder ID si ha cambiado
-if drive_folder_id != st.session_state.drive_folder_id_val:
-    st.session_state.drive_folder_id_val = drive_folder_id
-    try:
-        with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
-            f.write(drive_folder_id)
-    except Exception:
-        pass
-
-# Mostrar confirmación visual del ID guardado
-if st.session_state.drive_folder_id_val:
-    st.sidebar.success(f"📁 ID de Carpeta guardado:\n`{st.session_state.drive_folder_id_val}`")
-
-
-# --- PANEL PRINCIPAL: PESTAÑAS ---
-tab_preview, tab_process = st.tabs(["👁️ Previsualización y Diseño", "🚀 Procesamiento en Lote"])
-
-# PESTAÑA 1: PREVISUALIZACIÓN Y DISEÑO
-with tab_preview:
-    st.markdown("### 🎨 Diseñador de Plantilla (Arrastra y Redimensiona con tu Mouse)")
-    
     if st.session_state.template_image:
-        st.markdown("<small>✨ Haz clic sobre la caja **NOMBRE** (azul/celeste) o la caja **QR** (naranja) para **arrastrarlas y moverlas** por la pantalla o **estirarlas desde las esquinas** para cambiar su tamaño.</small>", unsafe_allow_html=True)
+        st.success("🟢 ¡Plantilla cargada con éxito!")
+        st.image(st.session_state.template_image, caption="Tu plantilla de fondo", use_column_width=True)
+        
+        st.markdown("---")
+        if st.button("➡️ Siguiente Paso: Ubicar Elementos con el Mouse", use_container_width=True):
+            st.session_state.current_step = 2
+            st.experimental_rerun()
+    else:
+        st.info("💡 Sube una imagen en la caja de arriba para poder continuar al siguiente paso.")
+
+
+# --- PASO 2: DISEÑAR POSICIONES ---
+elif step == 2:
+    st.markdown("### 2️⃣ Paso 2: Ajustar Cajas de Nombre y QR con el Mouse")
+    
+    if not st.session_state.template_image:
+        st.warning("⚠️ No se ha detectado ninguna plantilla de fondo. Por favor vuelve al paso anterior.")
+        if st.button("⬅️ Volver a Paso 1: Subir Plantilla", use_container_width=True):
+            st.session_state.current_step = 1
+            st.experimental_rerun()
+    else:
+        st.markdown("✨ Haz clic sobre la caja **NOMBRE** (azul/celeste) o la caja **QR** (naranja) para **arrastrarlas y moverlas** por la pantalla, o **estíralas desde las esquinas** para cambiar su tamaño.")
         
         img = st.session_state.template_image
         orig_w, orig_h = img.size
         
-        # Canvas de ancho completo (ej. 800px) para un diseño amplio y cómodo
         canvas_width = 800
         canvas_height = int(orig_h * (canvas_width / orig_w))
         scale = orig_w / canvas_width
         
-        # Construir dibujo inicial de Fabric.js con las cajas NOMBRE y QR estáticas (evita snap-back al actualizar de forma interactiva)
         initial_drawing = {
             "version": "4.4.0",
             "objects": [
@@ -268,7 +348,7 @@ with tab_preview:
                     "top": float(100 / scale),
                     "width": float(400 / scale),
                     "height": float(70 / scale),
-                    "fill": "rgba(0, 169, 157, 0.35)",  # Teal semitransparente
+                    "fill": "rgba(0, 169, 157, 0.35)",
                     "stroke": "#00A99D",
                     "strokeWidth": 2,
                     "angle": 0,
@@ -283,7 +363,7 @@ with tab_preview:
                     "top": float(200 / scale),
                     "width": float(200 / scale),
                     "height": float(200 / scale),
-                    "fill": "rgba(247, 148, 29, 0.35)",  # Naranja semitransparente
+                    "fill": "rgba(247, 148, 29, 0.35)",
                     "stroke": "#F7941D",
                     "strokeWidth": 2,
                     "angle": 0,
@@ -295,7 +375,6 @@ with tab_preview:
             ]
         }
         
-        # Mostrar el diseñador de lienzo
         canvas_result = st_canvas(
             fill_color="rgba(0, 0, 0, 0)",
             stroke_width=2,
@@ -309,20 +388,15 @@ with tab_preview:
             key="canvas_designer",
         )
         
-        # Capturar movimientos de las cajas
         if canvas_result.json_data is not None:
             objects = canvas_result.json_data.get("objects", [])
-            
-            # Buscamos y leemos la nueva posición de ambas cajas
             if len(objects) >= 2:
                 obj_name = objects[0]
                 obj_qr = objects[1]
                 
-                # Función helper para extraer coordenadas del canvas con escala
                 def get_scaled_coords(obj):
                     left = obj.get("left", 0)
                     top = obj.get("top", 0)
-                    # En Fabric.js, redimensionar cambia scaleX y scaleY
                     w = obj.get("width", 50) * obj.get("scaleX", 1.0)
                     h = obj.get("height", 50) * obj.get("scaleY", 1.0)
                     return int(left * scale), int(top * scale), int(w * scale), int(h * scale)
@@ -330,7 +404,6 @@ with tab_preview:
                 nx, ny, nw, nh = get_scaled_coords(obj_name)
                 qx, qy, qw, qh = get_scaled_coords(obj_qr)
                 
-                # Guardar las nuevas coordenadas en st.session_state (se actualizarán en la barra lateral sin necesidad de st.experimental_rerun)
                 st.session_state.name_x = nx
                 st.session_state.name_y = ny
                 st.session_state.name_w = nw
@@ -340,18 +413,86 @@ with tab_preview:
                 st.session_state.qr_y = qy
                 st.session_state.qr_w = qw
                 st.session_state.qr_h = qh
-            
+
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Paso Anterior (Plantilla)", use_container_width=True):
+                st.session_state.current_step = 1
+                st.experimental_rerun()
+        with col2:
+            if st.button("➡️ Siguiente Paso: Configurar Google Drive", use_container_width=True):
+                st.session_state.current_step = 3
+                st.experimental_rerun()
+
+
+# --- PASO 3: GOOGLE DRIVE ---
+elif step == 3:
+    st.markdown("### 3️⃣ Paso 3: Conectar a Google Drive (Opcional)")
+    st.markdown("Si deseas subir automáticamente los PDFs a Google Drive y enlazar los códigos QR a esos PDFs, configura tus datos aquí.")
+    st.markdown("💡 *Si prefieres no usar Google Drive, simplemente no configures nada en esta sección y presiona el botón de 'Siguiente Paso'. Los boletines se generarán igual para que los descargues en un solo ZIP.*")
+    
+    st.markdown("---")
+    
+    # Mostrar estado de credenciales guardadas
+    if os.path.exists(SAVED_CREDS_PATH) or (st.session_state.google_credentials_path == SAVED_CREDS_PATH):
+        st.success("🟢 Conectado exitosamente: Las credenciales ya están guardadas de forma segura en el servidor.")
     else:
-        st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder posicionar y arrastrar las cajas de Nombre y QR con tu mouse.")
+        st.info("🟡 Sin conexión: No hay credenciales de Drive guardadas todavía.")
+        
+    uploaded_creds_main = st.file_uploader(
+        "Subir archivo JSON de credenciales de Google Drive (Reemplazar/Configurar)",
+        type=["json"],
+        key="main_drive_creds_uploader"
+    )
+    
+    if uploaded_creds_main:
+        try:
+            with open(SAVED_CREDS_PATH, "wb") as f:
+                f.write(uploaded_creds_main.read())
+            st.session_state.google_credentials_path = SAVED_CREDS_PATH
+            st.success("¡Credenciales de Google Drive guardadas con éxito en el servidor!")
+        except Exception as e:
+            st.error(f"Error al guardar credenciales: {e}")
+            
+    drive_folder_id = st.text_input(
+        "Folder ID de Google Drive (Pega aquí la clave de tu carpeta de Drive)",
+        value=st.session_state.drive_folder_id_val
+    )
+    
+    if drive_folder_id != st.session_state.drive_folder_id_val:
+        st.session_state.drive_folder_id_val = drive_folder_id
+        try:
+            with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
+                f.write(drive_folder_id)
+        except Exception:
+            pass
+            
+    if st.session_state.drive_folder_id_val:
+        st.info(f"📁 Carpeta vinculada ID: `{st.session_state.drive_folder_id_val}`")
+
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅️ Paso Anterior (Diseñar)", use_container_width=True):
+            st.session_state.current_step = 2
+            st.experimental_rerun()
+    with col2:
+        if st.button("➡️ Siguiente Paso: Subir PowerPoint y Generar", use_container_width=True):
+            st.session_state.current_step = 4
+            st.experimental_rerun()
 
 
-# PESTAÑA 2: PROCESAMIENTO EN LOTE
-with tab_process:
-    st.markdown("### Procesar Presentaciones PowerPoint (.pptx)")
+# --- PASO 4: SUBIR BOLETINES Y GENERAR ---
+elif step == 4:
+    st.markdown("### 4️⃣ Paso 4: Subir Boletines PowerPoint y Generar Resultados")
+    st.markdown("Sube las presentaciones de PowerPoint (.pptx) de tus alumnos o un archivo ZIP que contenga todas. ¡El sistema las convertirá en PDF y colocará los QR de forma totalmente automática!")
+    
     uploaded_files = st.file_uploader(
         "Sube tus archivos PowerPoint (.pptx) o un archivo .zip que los contenga",
         type=["pptx", "zip"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key="main_pptx_uploader"
     )
     
     if uploaded_files:
@@ -360,7 +501,6 @@ with tab_process:
         st.session_state.processed_zip_data = None
         st.session_state.results_gallery = []
         
-        # Crear entorno temporal para el procesamiento
         temp_dir = tempfile.mkdtemp()
         pptx_files = []
         
@@ -377,7 +517,6 @@ with tab_process:
                 with open(dest, "wb") as f:
                     f.write(u_file.read())
         
-        # Escanear archivos extraídos o subidos
         for root, _, files in os.walk(temp_dir):
             for file in files:
                 if file.lower().endswith(".pptx") and not file.startswith("~$"):
@@ -388,7 +527,6 @@ with tab_process:
         else:
             st.success(f"¡Se detectaron {len(pptx_files)} archivos de boletines PowerPoint listos para procesar!")
             
-            # Extraer nombres automáticamente para revisar
             students = []
             extracted_students = batch_extract_names(pptx_files)
             
@@ -407,12 +545,11 @@ with tab_process:
                         )
                         students.append({"path": student["path"], "name": edited_name})
                         
-            # Botón de Procesar
-            if st.button("🚀 Iniciar Procesamiento Completo"):
+            # Botón de Procesar gigante y visible
+            if st.button("🚀 INICIAR PROCESAMIENTO COMPLETO", use_container_width=True):
                 if not st.session_state.template_path:
-                    st.error("Debes cargar una imagen plantilla en el panel lateral antes de procesar.")
+                    st.error("Falta la imagen de la plantilla. Por favor vuelve al Paso 1.")
                 else:
-                    # Preparar directorios de salida
                     out_dir = tempfile.mkdtemp()
                     out_pdf = os.path.join(out_dir, "PDF")
                     out_qr = os.path.join(out_dir, "QR")
@@ -432,10 +569,9 @@ with tab_process:
                     
                     add_log(f"Iniciando procesamiento de {len(students)} boletines...")
                     
-                    # Conectar a Drive si aplica
                     uploader = create_uploader(
                         st.session_state.google_credentials_path,
-                        drive_folder_id,
+                        st.session_state.drive_folder_id_val,
                         mock=not bool(st.session_state.google_credentials_path)
                     )
                     if st.session_state.google_credentials_path:
@@ -529,11 +665,9 @@ with tab_process:
                      # Generar ZIP consolidado para descarga
                     zip_download_path = os.path.join(temp_dir, "boletines_procesados.zip")
                     with zipfile.ZipFile(zip_download_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        # Guardar PNGs
                         for root_dir, _, files in os.walk(out_png):
                             for file in files:
                                 zipf.write(os.path.join(root_dir, file), os.path.join("Imagenes", file))
-                        # Guardar PDFs
                         for root_dir, _, files in os.walk(out_pdf):
                             for file in files:
                                 zipf.write(os.path.join(root_dir, file), os.path.join("PDFs", file))
@@ -567,7 +701,8 @@ with tab_process:
             label="📥 Descargar todos los boletines (.ZIP)",
             data=st.session_state.processed_zip_data,
             file_name="boletines_procesados.zip",
-            mime="application/zip"
+            mime="application/zip",
+            use_container_width=True
         )
         
         # Mostrar galería de forma permanente con enlaces clicables a los PDFs
@@ -596,3 +731,8 @@ with tab_process:
                         st.markdown(clickable_html, unsafe_allow_html=True)
                     except Exception as e:
                         st.image(res["img"], caption=res["name"], use_column_width=True)
+
+    st.markdown("---")
+    if st.button("⬅️ Paso Anterior (Google Drive)", use_container_width=True):
+        st.session_state.current_step = 3
+        st.experimental_rerun()
