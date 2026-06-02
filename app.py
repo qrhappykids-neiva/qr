@@ -118,16 +118,16 @@ if "drive_folder_id_val" not in st.session_state:
     else:
         st.session_state.drive_folder_id_val = ""
 
-# Inicializar coordenadas en session_state para enlace bidireccional
+# Inicializar coordenadas en session_state con valores por defecto tipo escritorio
 if "name_x" not in st.session_state: st.session_state.name_x = 100
-if "name_y" not in st.session_state: st.session_state.name_y = 1000
-if "name_w" not in st.session_state: st.session_state.name_w = 800
-if "name_h" not in st.session_state: st.session_state.name_h = 120
+if "name_y" not in st.session_state: st.session_state.name_y = 100
+if "name_w" not in st.session_state: st.session_state.name_w = 400
+if "name_h" not in st.session_state: st.session_state.name_h = 70
 
 if "qr_x" not in st.session_state: st.session_state.qr_x = 100
-if "qr_y" not in st.session_state: st.session_state.qr_y = 100
-if "qr_w" not in st.session_state: st.session_state.qr_w = 250
-if "qr_h" not in st.session_state: st.session_state.qr_h = 250
+if "qr_y" not in st.session_state: st.session_state.qr_y = 200
+if "qr_w" not in st.session_state: st.session_state.qr_w = 200
+if "qr_h" not in st.session_state: st.session_state.qr_h = 200
 
 # Variables de persistencia para descarga y galería en la web
 if "processed_zip_data" not in st.session_state:
@@ -173,10 +173,16 @@ st.sidebar.markdown("#### 📍 Posicionamiento de Elementos")
 
 # Caja de Nombre
 with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
-    name_x = st.sidebar.number_input("X (Posición horizontal)", step=10, key="name_x")
-    name_y = st.sidebar.number_input("Y (Posición vertical)", step=10, key="name_y")
-    name_w = st.sidebar.number_input("Ancho de la caja", step=10, key="name_w")
-    name_h = st.sidebar.number_input("Alto de la caja", step=10, key="name_h")
+    name_x_val = st.number_input("X (Posición horizontal)", value=int(st.session_state.name_x), step=10)
+    name_y_val = st.number_input("Y (Posición vertical)", value=int(st.session_state.name_y), step=10)
+    name_w_val = st.number_input("Ancho de la caja", value=int(st.session_state.name_w), step=10)
+    name_h_val = st.number_input("Alto de la caja", value=int(st.session_state.name_h), step=10)
+    
+    # Asignar manualmente para evitar error de clave inmutable de Streamlit
+    st.session_state.name_x = name_x_val
+    st.session_state.name_y = name_y_val
+    st.session_state.name_w = name_w_val
+    st.session_state.name_h = name_h_val
 
     st.markdown("**Estilo de Texto**")
     font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman"])
@@ -187,11 +193,17 @@ with st.sidebar.expander("👤 Caja del Nombre del Estudiante", expanded=False):
 
 # Caja de QR
 with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
-    qr_x = st.sidebar.number_input("X (Posición QR)", step=10, key="qr_x")
-    qr_y = st.sidebar.number_input("Y (Posición QR)", step=10, key="qr_y")
-    qr_w = st.sidebar.number_input("Ancho QR", step=10, key="qr_w")
-    qr_h = st.sidebar.number_input("Alto QR", step=10, key="qr_h")
+    qr_x_val = st.number_input("X (Posición QR)", value=int(st.session_state.qr_x), step=10)
+    qr_y_val = st.number_input("Y (Posición QR)", value=int(st.session_state.qr_y), step=10)
+    qr_w_val = st.number_input("Ancho QR", value=int(st.session_state.qr_w), step=10)
+    qr_h_val = st.number_input("Alto QR", value=int(st.session_state.qr_h), step=10)
     qr_ecc = st.selectbox("Corrección de errores QR", ["H (Máxima)", "Q (Alta)", "M (Media)", "L (Baja)"])
+    
+    # Asignar manualmente
+    st.session_state.qr_x = qr_x_val
+    st.session_state.qr_y = qr_y_val
+    st.session_state.qr_w = qr_w_val
+    st.session_state.qr_h = qr_h_val
 
 # 3. Google Drive (Opcional)
 with st.sidebar.expander("☁️ Conectar a Google Drive (Opcional)", expanded=False):
@@ -233,116 +245,111 @@ tab_preview, tab_process = st.tabs(["👁️ Previsualización y Diseño", "🚀
 
 # PESTAÑA 1: PREVISUALIZACIÓN Y DISEÑO
 with tab_preview:
-    st.markdown("### 🎨 Posicionamiento Interactivo con el Mouse")
+    st.markdown("### 🎨 Diseñador de Plantilla (Arrastra y Redimensiona con tu Mouse)")
     
     if st.session_state.template_image:
-        col_canvas, col_preview = st.columns([1, 1])
+        st.markdown("<small>✨ Haz clic sobre la caja **NOMBRE** (azul/celeste) o la caja **QR** (naranja) para **arrastrarlas y moverlas** por la pantalla o **estirarlas desde las esquinas** para cambiar su tamaño.</small>", unsafe_allow_html=True)
         
-        with col_canvas:
-            st.markdown("#### 1. Dibuja sobre la plantilla para posicionar")
-            
-            # Selector de qué elemento dibujar
-            active_target = st.radio(
-                "🎯 Selecciona qué elemento deseas posicionar dibujando en la plantilla:",
-                ["👤 Caja del Nombre del Estudiante", "📲 Caja del Código QR"],
-                horizontal=True
-            )
-            
-            img = st.session_state.template_image
-            orig_w, orig_h = img.size
-            
-            # Escalar el canvas a un ancho de pantalla razonable (ej. 500px) manteniendo aspecto
-            canvas_width = 500
-            canvas_height = int(orig_h * (canvas_width / orig_w))
-            
-            st.markdown("<small>✨ Haz clic y arrastra con el mouse para dibujar el rectángulo donde irá el elemento seleccionado.</small>", unsafe_allow_html=True)
-            
-            # Renderizar el lienzo de dibujo
-            canvas_result = st_canvas(
-                fill_color="rgba(0, 169, 157, 0.25)" if "Nombre" in active_target else "rgba(247, 148, 29, 0.25)",
-                stroke_width=2,
-                stroke_color="#00A99D" if "Nombre" in active_target else "#F7941D",
-                background_image=img,
-                update_streamlit=True,
-                width=canvas_width,
-                height=canvas_height,
-                drawing_mode="rect",
-                key="canvas_designer",
-            )
-            
-            # Procesar el rectángulo dibujado
-            if canvas_result.json_data is not None:
-                objects = canvas_result.json_data.get("objects", [])
-                if objects:
-                    last_rect = objects[-1]
-                    if last_rect.get("type") == "rect":
-                        scale = orig_w / canvas_width
-                        x = int(last_rect["left"] * scale)
-                        y = int(last_rect["top"] * scale)
-                        w = int(last_rect["width"] * scale)
-                        h = int(last_rect["height"] * scale)
-                        
-                        # Actualizar session_state
-                        if "Nombre" in active_target:
-                            st.session_state.name_x = x
-                            st.session_state.name_y = y
-                            st.session_state.name_w = w
-                            st.session_state.name_h = h
-                        else:
-                            st.session_state.qr_x = x
-                            st.session_state.qr_y = y
-                            st.session_state.qr_w = w
-                            st.session_state.qr_h = h
-                            
-                        # Forzar actualización en Streamlit
-                        st.experimental_rerun()
+        img = st.session_state.template_image
+        orig_w, orig_h = img.size
         
-        with col_preview:
-            st.markdown("#### 2. Previsualización del Boletín de Muestra")
-            st.markdown("<small>Esta es una muestra final con resolución de impresión (300 DPI) para validar la calidad.</small>", unsafe_allow_html=True)
+        # Canvas de ancho completo (ej. 800px) para un diseño amplio y cómodo
+        canvas_width = 800
+        canvas_height = int(orig_h * (canvas_width / orig_w))
+        scale = orig_w / canvas_width
+        
+        # Construir dibujo inicial de Fabric.js con las cajas NOMBRE y QR
+        initial_drawing = {
+            "version": "4.4.0",
+            "objects": [
+                {
+                    "type": "rect",
+                    "left": float(st.session_state.name_x / scale),
+                    "top": float(st.session_state.name_y / scale),
+                    "width": float(st.session_state.name_w / scale),
+                    "height": float(st.session_state.name_h / scale),
+                    "fill": "rgba(0, 169, 157, 0.35)",  # Teal semitransparente
+                    "stroke": "#00A99D",
+                    "strokeWidth": 2,
+                    "angle": 0,
+                    "scaleX": 1.0,
+                    "scaleY": 1.0,
+                    "selectable": True,
+                    "label": "NOMBRE"
+                },
+                {
+                    "type": "rect",
+                    "left": float(st.session_state.qr_x / scale),
+                    "top": float(st.session_state.qr_y / scale),
+                    "width": float(st.session_state.qr_w / scale),
+                    "height": float(st.session_state.qr_h / scale),
+                    "fill": "rgba(247, 148, 29, 0.35)",  # Naranja semitransparente
+                    "stroke": "#F7941D",
+                    "strokeWidth": 2,
+                    "angle": 0,
+                    "scaleX": 1.0,
+                    "scaleY": 1.0,
+                    "selectable": True,
+                    "label": "QR"
+                }
+            ]
+        }
+        
+        # Mostrar el diseñador de lienzo
+        canvas_result = st_canvas(
+            fill_color="rgba(0, 0, 0, 0)",
+            stroke_width=2,
+            background_image=img,
+            initial_drawing=initial_drawing,
+            update_streamlit=True,
+            width=canvas_width,
+            height=canvas_height,
+            drawing_mode="transform",
+            display_toolbar=False,
+            key="canvas_designer",
+        )
+        
+        # Capturar movimientos de las cajas
+        if canvas_result.json_data is not None:
+            objects = canvas_result.json_data.get("objects", [])
             
-            # Generar QR de prueba
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_qr:
-                generate_qr("https://github.com", tmp_qr.name, size=800, error_correction=qr_ecc[0])
+            # Buscamos y leemos la nueva posición de ambas cajas
+            if len(objects) >= 2:
+                obj_name = objects[0]
+                obj_qr = objects[1]
                 
-                # Componer previsualización en alta definición
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_preview:
-                    compose_bulletin(
-                        template_path=st.session_state.template_path,
-                        output_path=tmp_preview.name,
-                        student_name="DULCE MARÍA MONTOYA SIERRA",
-                        qr_path=tmp_qr.name,
-                        name_box={
-                            "x": st.session_state.name_x,
-                            "y": st.session_state.name_y,
-                            "width": st.session_state.name_w,
-                            "height": st.session_state.name_h
-                        },
-                        qr_box={
-                            "x": st.session_state.qr_x,
-                            "y": st.session_state.qr_y,
-                            "width": st.session_state.qr_w,
-                            "height": st.session_state.qr_h
-                        },
-                        text_config={
-                            "font_family": font_family,
-                            "font_size": font_size,
-                            "font_bold": font_bold,
-                            "color": font_color,
-                            "align": font_align
-                        },
-                        dpi=300
-                    )
+                # Función helper para extraer coordenadas del canvas con escala
+                def get_scaled_coords(obj):
+                    left = obj.get("left", 0)
+                    top = obj.get("top", 0)
+                    # En Fabric.js, redimensionar cambia scaleX y scaleY
+                    w = obj.get("width", 50) * obj.get("scaleX", 1.0)
+                    h = obj.get("height", 50) * obj.get("scaleY", 1.0)
+                    return int(left * scale), int(top * scale), int(w * scale), int(h * scale)
+                
+                nx, ny, nw, nh = get_scaled_coords(obj_name)
+                qx, qy, qw, qh = get_scaled_coords(obj_qr)
+                
+                # Evitar bucles infinitos actualizando solo ante cambios reales
+                if (nx != st.session_state.name_x or ny != st.session_state.name_y or 
+                    nw != st.session_state.name_w or nh != st.session_state.name_h or
+                    qx != st.session_state.qr_x or qy != st.session_state.qr_y or
+                    qw != st.session_state.qr_w or qh != st.session_state.qr_h):
                     
-                    # Mostrar la imagen de alta definición
-                    preview_img = Image.open(tmp_preview.name)
-                    st.image(preview_img, caption="Previsualización de Impresión", use_column_width=True)
+                    st.session_state.name_x = nx
+                    st.session_state.name_y = ny
+                    st.session_state.name_w = nw
+                    st.session_state.name_h = nh
                     
-                os.unlink(tmp_qr.name)
-                os.unlink(tmp_preview.name)
+                    st.session_state.qr_x = qx
+                    st.session_state.qr_y = qy
+                    st.session_state.qr_w = qw
+                    st.session_state.qr_h = qh
+                    
+                    st.experimental_rerun()
             
     else:
-        st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder diseñar y arrastrar con el mouse.")
+        st.info("💡 Sube una imagen de plantilla (JPG/PNG) en el panel lateral para poder posicionar y arrastrar las cajas de Nombre y QR con tu mouse.")
 
 
 # PESTAÑA 2: PROCESAMIENTO EN LOTE
