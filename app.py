@@ -233,6 +233,10 @@ if drive_folder_id != st.session_state.drive_folder_id_val:
     except Exception:
         pass
 
+# Mostrar confirmación visual del ID guardado
+if st.session_state.drive_folder_id_val:
+    st.sidebar.success(f"📁 ID de Carpeta guardado:\n`{st.session_state.drive_folder_id_val}`")
+
 
 # --- PANEL PRINCIPAL: PESTAÑAS ---
 tab_preview, tab_process = st.tabs(["👁️ Previsualización y Diseño", "🚀 Procesamiento en Lote"])
