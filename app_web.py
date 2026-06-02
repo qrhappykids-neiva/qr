@@ -399,10 +399,12 @@ if step == 1:
             with col_skip2:
                 if st.button("✏️ Ajustar Diseño y Posición (Paso 2)", use_container_width=True):
                     st.session_state.current_step = 2
+                    st.session_state.reset_canvas = True
                     st.rerun()
         else:
             if st.button("➡️ Siguiente Paso: Ubicar Elementos con el Mouse", use_container_width=True):
                 st.session_state.current_step = 2
+                st.session_state.reset_canvas = True
                 st.rerun()
     else:
         st.info("💡 Por favor, configura una plantilla para poder continuar al siguiente paso.")
@@ -424,50 +426,50 @@ elif step == 2:
         orig_w, orig_h = img.size
         
         canvas_width = 800
-        canvas_height = int(orig_h * (canvas_width / orig_w))
-        scale = orig_w / canvas_width
-        
-        initial_drawing = {
-            "version": "4.4.0",
-            "objects": [
-                {
-                    "type": "rect",
-                    "left": float(st.session_state.name_x / scale),
-                    "top": float(st.session_state.name_y / scale),
-                    "width": float(st.session_state.name_w / scale),
-                    "height": float(st.session_state.name_h / scale),
-                    "fill": "rgba(0, 169, 157, 0.35)",
-                    "stroke": "#00A99D",
-                    "strokeWidth": 2,
-                    "angle": 0,
-                    "scaleX": 1.0,
-                    "scaleY": 1.0,
-                    "selectable": True,
-                    "label": "NOMBRE"
-                },
-                {
-                    "type": "rect",
-                    "left": float(st.session_state.qr_x / scale),
-                    "top": float(st.session_state.qr_y / scale),
-                    "width": float(st.session_state.qr_w / scale),
-                    "height": float(st.session_state.qr_h / scale),
-                    "fill": "rgba(247, 148, 29, 0.35)",
-                    "stroke": "#F7941D",
-                    "strokeWidth": 2,
-                    "angle": 0,
-                    "scaleX": 1.0,
-                    "scaleY": 1.0,
-                    "selectable": True,
-                    "label": "QR"
-                }
-            ]
-        }
+        canvas_heigh        # Inicializar el dibujo inicial una sola vez para evitar bucles de actualización en st_canvas
+        if "canvas_initial_drawing" not in st.session_state or st.session_state.get("reset_canvas", False):
+            st.session_state.canvas_initial_drawing = {
+                "version": "4.4.0",
+                "objects": [
+                    {
+                        "type": "rect",
+                        "left": float(st.session_state.name_x / scale),
+                        "top": float(st.session_state.name_y / scale),
+                        "width": float(st.session_state.name_w / scale),
+                        "height": float(st.session_state.name_h / scale),
+                        "fill": "rgba(0, 169, 157, 0.35)",
+                        "stroke": "#00A99D",
+                        "strokeWidth": 2,
+                        "angle": 0,
+                        "scaleX": 1.0,
+                        "scaleY": 1.0,
+                        "selectable": True,
+                        "label": "NOMBRE"
+                    },
+                    {
+                        "type": "rect",
+                        "left": float(st.session_state.qr_x / scale),
+                        "top": float(st.session_state.qr_y / scale),
+                        "width": float(st.session_state.qr_w / scale),
+                        "height": float(st.session_state.qr_h / scale),
+                        "fill": "rgba(247, 148, 29, 0.35)",
+                        "stroke": "#F7941D",
+                        "strokeWidth": 2,
+                        "angle": 0,
+                        "scaleX": 1.0,
+                        "scaleY": 1.0,
+                        "selectable": True,
+                        "label": "QR"
+                    }
+                ]
+            }
+            st.session_state.reset_canvas = False
         
         canvas_result = st_canvas(
             fill_color="rgba(0, 0, 0, 0)",
             stroke_width=2,
             background_image=img,
-            initial_drawing=initial_drawing,
+            initial_drawing=st.session_state.canvas_initial_drawing,
             update_streamlit=True,
             width=canvas_width,
             height=canvas_height,
@@ -492,26 +494,32 @@ elif step == 2:
                 nx, ny, nw, nh = get_scaled_coords(obj_name)
                 qx, qy, qw, qh = get_scaled_coords(obj_qr)
                 
-                st.session_state.name_x = nx
-                st.session_state.name_y = ny
-                st.session_state.name_w = nw
-                st.session_state.name_h = nh
-                
-                st.session_state.qr_x = qx
-                st.session_state.qr_y = qy
-                st.session_state.qr_w = qw
-                st.session_state.qr_h = qh
-
-                # Guardar coordenadas en archivo permanente
-                try:
-                    import json
-                    with open(SAVED_COORDS_PATH, "w", encoding="utf-8") as f:
-                        json.dump({
-                            "name_x": nx, "name_y": ny, "name_w": nw, "name_h": nh,
-                            "qr_x": qx, "qr_y": qy, "qr_w": qw, "qr_h": qh
-                        }, f)
-                except Exception:
-                    pass
+                # Solo actualizar si cambiaron de forma relevante para evitar loops infinitos
+                if (nx != st.session_state.name_x or ny != st.session_state.name_y or
+                    nw != st.session_state.name_w or nh != st.session_state.name_h or
+                    qx != st.session_state.qr_x or qy != st.session_state.qr_y or
+                    qw != st.session_state.qr_w or qh != st.session_state.qr_h):
+                    
+                    st.session_state.name_x = nx
+                    st.session_state.name_y = ny
+                    st.session_state.name_w = nw
+                    st.session_state.name_h = nh
+                    
+                    st.session_state.qr_x = qx
+                    st.session_state.qr_y = qy
+                    st.session_state.qr_w = qw
+                    st.session_state.qr_h = qh
+    
+                    # Guardar coordenadas en archivo permanente
+                    try:
+                        import json
+                        with open(SAVED_COORDS_PATH, "w", encoding="utf-8") as f:
+                            json.dump({
+                                "name_x": nx, "name_y": ny, "name_w": nw, "name_h": nh,
+                                "qr_x": qx, "qr_y": qy, "qr_w": qw, "qr_h": qh
+                            }, f)
+                    except Exception:
+                        pass
 
         st.markdown("---")
         col1, col2 = st.columns(2)
