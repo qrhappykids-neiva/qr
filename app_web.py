@@ -254,8 +254,7 @@ with tab_process:
             
             # Extraer nombres automáticamente para revisar
             students = []
-            file_dicts = [{"path": f, "name": os.path.splitext(os.path.basename(f))[0]} for f in pptx_files]
-            extracted_students = batch_extract_names(file_dicts)
+            extracted_students = batch_extract_names(pptx_files)
             
             with st.expander("✏️ Revisar y Editar Nombres Detectados antes de Iniciar", expanded=True):
                 st.markdown("<small>Puedes modificar los nombres si la extracción automática no los detectó correctamente.</small>", unsafe_allow_html=True)
