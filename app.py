@@ -426,7 +426,9 @@ elif step == 2:
         orig_w, orig_h = img.size
         
         canvas_width = 800
-        canvas_height        # Inicializar el dibujo inicial una sola vez para evitar bucles de actualización en st_canvas
+        canvas_height = int(orig_h * (canvas_width / orig_w))
+        scale = orig_w / canvas_width
+        # Inicializar el dibujo inicial una sola vez para evitar bucles de actualización en st_canvas
         if "canvas_initial_drawing" not in st.session_state or st.session_state.get("reset_canvas", False):
             st.session_state.canvas_initial_drawing = {
                 "version": "4.4.0",
