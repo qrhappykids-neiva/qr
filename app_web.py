@@ -512,7 +512,8 @@ with tab_process:
                                 },
                                 dpi=300
                             )
-                                                        add_log("  ✅ Boletín final PNG generado en alta resolución")
+                            if ok_png:
+                                add_log("  ✅ Boletín final PNG generado en alta resolución")
                                 success_count += 1
                                 results.append({"name": name, "png": png_path, "qr_link": qr_link})
                             else:
