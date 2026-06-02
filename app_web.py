@@ -641,7 +641,8 @@ elif step == 3:
                                     if drive_url:
                                         add_log(f"  ✅ Subido a Drive: {drive_url[:50]}...")
                                     else:
-                                        add_log("  ❌ Error subiendo a Google Drive")
+                                        err_msg = getattr(uploader, "last_error", "Error desconocido")
+                                        add_log(f"  ❌ Error subiendo a Google Drive: {err_msg}")
                                 
                                 # 3. QR
                                 progress_bar.progress((idx * 4 + 3) / (total * 4))

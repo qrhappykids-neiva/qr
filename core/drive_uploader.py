@@ -25,6 +25,7 @@ class GoogleDriveUploader:
         self._service = None
         self._authenticated = False
         self.is_mock = False
+        self.last_error = ""
 
     def authenticate(self) -> bool:
         # 1. Intentar autenticación por Cuenta de Servicio si es ese tipo de JSON
@@ -169,6 +170,7 @@ class GoogleDriveUploader:
             return share_link
 
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"Error subiendo {pdf_path}: {e}")
             return None
 
