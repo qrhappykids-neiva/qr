@@ -395,17 +395,17 @@ if step == 1:
             with col_skip1:
                 if st.button("🚀 Ir Directo a Generar Boletines (Paso 3)", use_container_width=True, type="primary"):
                     st.session_state.current_step = 3
-                    st.experimental_rerun()
+                    st.rerun()
             with col_skip2:
                 if st.button("✏️ Ajustar Diseño y Posición (Paso 2)", use_container_width=True):
                     st.session_state.current_step = 2
                     st.session_state.reset_canvas = True
-                    st.experimental_rerun()
+                    st.rerun()
         else:
             if st.button("➡️ Siguiente Paso: Ubicar Elementos con el Mouse", use_container_width=True):
                 st.session_state.current_step = 2
                 st.session_state.reset_canvas = True
-                st.experimental_rerun()
+                st.rerun()
     else:
         st.info("💡 Por favor, configura una plantilla para poder continuar al siguiente paso.")
 
@@ -418,7 +418,7 @@ elif step == 2:
         st.warning("⚠️ No se ha detectado ninguna plantilla de fondo. Por favor vuelve al paso anterior.")
         if st.button("⬅️ Volver a Paso 1: Subir Plantilla", use_container_width=True):
             st.session_state.current_step = 1
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.markdown("✨ Haz clic sobre la caja **NOMBRE** (azul/celeste) o la caja **QR** (naranja) para **arrastrarlas y moverlas** por la pantalla, o **estíralas desde las esquinas** para cambiar su tamaño.")
         
@@ -528,11 +528,11 @@ elif step == 2:
         with col1:
             if st.button("⬅️ Paso Anterior (Plantilla)", use_container_width=True):
                 st.session_state.current_step = 1
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("➡️ Siguiente Paso: Subir PowerPoint y Generar", use_container_width=True):
                 st.session_state.current_step = 3
-                st.experimental_rerun()
+                st.rerun()
 
 
 # --- PASO 3: SUBIR BOLETINES Y GENERAR ---
@@ -559,7 +559,7 @@ elif step == 3:
                 st.session_state.processed_zip_data = None
                 st.session_state.results_gallery = []
                 st.session_state.current_step = 1
-                st.experimental_rerun()
+                st.rerun()
         
         # Mostrar galería de forma permanente con enlaces clicables a los PDFs
         if st.session_state.results_gallery:
@@ -799,7 +799,7 @@ elif step == 3:
                                 
                         # Limpieza de temporales al finalizar
                         shutil.rmtree(temp_dir, ignore_errors=True)
-                        st.experimental_rerun()
+                        st.rerun()
             
             # Limpieza de temporales al finalizar si no se inició el procesamiento
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -849,4 +849,4 @@ elif step == 3:
         st.markdown("---")
         if st.button("⬅️ Paso Anterior (Diseñar)", use_container_width=True):
             st.session_state.current_step = 2
-            st.experimental_rerun()
+            st.rerun()
