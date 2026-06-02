@@ -102,23 +102,51 @@ if "template_image" not in st.session_state:
 if "template_path" not in st.session_state:
     st.session_state.template_path = ""
 
-# Cargar automáticamente credenciales de Google Drive si ya existen guardadas
+# Cargar automáticamente credenciales de Google Drive si ya existen guardadas o están en st.secrets
+if "google_credentials_path" not in st.session_state:
+    if "GOOGLE_DRIVE_CREDENTIALS" in st.secrets:
+        try:
+            import json
+            creds_data = st.secrets["GOOGLE_DRIVE_CREDENTIALS"]
+            if isinstance(creds_data, str):
+                creds_dict = json.loads(creds_data)
+            else:
+                creds_dict = dict(creds_data)
+            with open(SAVED_CREDS_PATH, "w", encoding="utf-8") as f:
+                json.dump(creds_dict, f, indent=4)
+            st.session_state.google_credentials_path = SAVED_CREDS_PATH
+        except Exception:
+            pass
+
 if "google_credentials_path" not in st.session_state:
     if os.path.exists(SAVED_CREDS_PATH):
         st.session_state.google_credentials_path = SAVED_CREDS_PATH
     else:
-        st.session_state.google_credentials_path = ""
+        # Buscar en la carpeta local un archivo que empiece con client_secret y termine en .json
+        try:
+            local_secrets = [f for f in os.listdir(os.path.dirname(os.path.abspath(__file__))) 
+                             if f.startswith("client_secret") and f.endswith(".json")]
+            if local_secrets:
+                shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), local_secrets[0]), SAVED_CREDS_PATH)
+                st.session_state.google_credentials_path = SAVED_CREDS_PATH
+            else:
+                st.session_state.google_credentials_path = ""
+        except Exception:
+            st.session_state.google_credentials_path = ""
 
-# Cargar automáticamente el Folder ID de Google Drive si ya existe guardado
+# Cargar automáticamente el Folder ID de Google Drive si ya existe guardado (con fallback por defecto o st.secrets)
 if "drive_folder_id_val" not in st.session_state:
-    if os.path.exists(SAVED_FOLDER_ID_PATH):
+    if "GOOGLE_DRIVE_FOLDER_ID" in st.secrets:
+        st.session_state.drive_folder_id_val = st.secrets["GOOGLE_DRIVE_FOLDER_ID"]
+    elif os.path.exists(SAVED_FOLDER_ID_PATH):
         try:
             with open(SAVED_FOLDER_ID_PATH, "r", encoding="utf-8") as f:
-                st.session_state.drive_folder_id_val = f.read().strip()
+                val = f.read().strip()
+                st.session_state.drive_folder_id_val = val if val else "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
         except Exception:
-            st.session_state.drive_folder_id_val = ""
+            st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
     else:
-        st.session_state.drive_folder_id_val = ""
+        st.session_state.drive_folder_id_val = "1ljat0NmC6_kPYN7HlQt1P5Ljaeyc9R8m"
 
 # Inicializar coordenadas en session_state con valores por defecto tipo escritorio
 if "name_x" not in st.session_state: st.session_state.name_x = 100
@@ -485,225 +513,29 @@ elif step == 3:
 
 # --- PASO 4: SUBIR BOLETINES Y GENERAR ---
 elif step == 4:
-    st.markdown("### 4️⃣ Paso 4: Subir Boletines PowerPoint y Generar Resultados")
-    st.markdown("Sube las presentaciones de PowerPoint (.pptx) de tus alumnos o un archivo ZIP que contenga todas. ¡El sistema las convertirá en PDF y colocará los QR de forma totalmente automática!")
-    
-    uploaded_files = st.file_uploader(
-        "Sube tus archivos PowerPoint (.pptx) o un archivo .zip que los contenga",
-        type=["pptx", "zip"],
-        accept_multiple_files=True,
-        key="main_pptx_uploader"
-    )
-    
-    if uploaded_files:
-        st.markdown(f"**Archivos cargados:** {len(uploaded_files)}")
-        # Limpiar resultados anteriores cuando se suben nuevos archivos
-        st.session_state.processed_zip_data = None
-        st.session_state.results_gallery = []
-        
-        temp_dir = tempfile.mkdtemp()
-        pptx_files = []
-        
-        for u_file in uploaded_files:
-            if u_file.name.endswith(".zip"):
-                zip_path = os.path.join(temp_dir, u_file.name)
-                with open(zip_path, "wb") as f:
-                    f.write(u_file.read())
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
-                os.unlink(zip_path)
-            else:
-                dest = os.path.join(temp_dir, u_file.name)
-                with open(dest, "wb") as f:
-                    f.write(u_file.read())
-        
-        for root, _, files in os.walk(temp_dir):
-            for file in files:
-                if file.lower().endswith(".pptx") and not file.startswith("~$"):
-                    pptx_files.append(os.path.join(root, file))
-                    
-        if len(pptx_files) == 0:
-            st.error("No se encontraron archivos PowerPoint (.pptx) en la selección.")
-        else:
-            st.success(f"¡Se detectaron {len(pptx_files)} archivos de boletines PowerPoint listos para procesar!")
-            
-            students = []
-            extracted_students = batch_extract_names(pptx_files)
-            
-            with st.expander("✏️ Revisar y Editar Nombres Detectados antes de Iniciar", expanded=True):
-                st.markdown("<small>Puedes modificar los nombres si la extracción automática no los detectó correctamente.</small>", unsafe_allow_html=True)
-                for idx, student in enumerate(extracted_students):
-                    col_file, col_name = st.columns([1, 1])
-                    with col_file:
-                        st.text(os.path.basename(student["path"]))
-                    with col_name:
-                        edited_name = st.text_input(
-                            f"Nombre del Estudiante {idx}",
-                            value=student["name"],
-                            key=f"name_{idx}",
-                            label_visibility="collapsed"
-                        )
-                        students.append({"path": student["path"], "name": edited_name})
-                        
-            # Botón de Procesar gigante y visible
-            if st.button("🚀 INICIAR PROCESAMIENTO COMPLETO", use_container_width=True):
-                if not st.session_state.template_path:
-                    st.error("Falta la imagen de la plantilla. Por favor vuelve al Paso 1.")
-                else:
-                    out_dir = tempfile.mkdtemp()
-                    out_pdf = os.path.join(out_dir, "PDF")
-                    out_qr = os.path.join(out_dir, "QR")
-                    out_png = os.path.join(out_dir, "PNG")
-                    os.makedirs(out_pdf, exist_ok=True)
-                    os.makedirs(out_qr, exist_ok=True)
-                    os.makedirs(out_png, exist_ok=True)
-                    
-                    progress_bar = st.progress(0)
-                    progress_text = st.empty()
-                    log_area = st.empty()
-                    log_messages = []
-                    
-                    def add_log(msg: str):
-                        log_messages.append(msg)
-                        log_area.code("\n".join(log_messages))
-                    
-                    add_log(f"Iniciando procesamiento de {len(students)} boletines...")
-                    
-                    uploader = create_uploader(
-                        st.session_state.google_credentials_path,
-                        st.session_state.drive_folder_id_val,
-                        mock=not bool(st.session_state.google_credentials_path)
-                    )
-                    if st.session_state.google_credentials_path:
-                        add_log("☁️ Conectado exitosamente a Google Drive.")
-                    else:
-                        add_log("ℹ️ No se cargaron credenciales de Drive. Los archivos se descargarán directamente en un archivo ZIP.")
-                    
-                    total = len(students)
-                    success_count = 0
-                    results = []
-                    
-                    for idx, student in enumerate(students):
-                        name = student["name"]
-                        pp_path = student["path"]
-                        safe_name = sanitize_filename(name)
-                        
-                        add_log(f"\n▶ [{idx+1}/{total}] {name}")
-                        progress_text.text(f"Procesando {idx+1} de {total}: {name}")
-                        
-                        pdf_path = os.path.join(out_pdf, f"{safe_name}.pdf")
-                        qr_path = os.path.join(out_qr, f"{safe_name}.png")
-                        png_path = os.path.join(out_png, f"{safe_name}.png")
-                        
-                        try:
-                            # 1. PPTX -> PDF
-                            progress_bar.progress((idx * 4 + 1) / (total * 4))
-                            add_log("  📄 Convirtiendo presentación a PDF...")
-                            ok, method = convert_with_fallback(pp_path, pdf_path)
-                            
-                            if ok:
-                                add_log(f"  ✅ PDF generado usando {method}")
-                            else:
-                                add_log("  ❌ Error de conversión a PDF")
-                                continue
-                                
-                            # 2. Drive
-                            progress_bar.progress((idx * 4 + 2) / (total * 4))
-                            drive_url = ""
-                            if st.session_state.google_credentials_path:
-                                add_log("  ☁️ Subiendo PDF a Google Drive...")
-                                drive_url = uploader.upload_pdf(pdf_path, f"{safe_name}.pdf")
-                                if drive_url:
-                                    add_log(f"  ✅ Subido a Drive: {drive_url[:50]}...")
-                                else:
-                                    add_log("  ❌ Error subiendo a Google Drive")
-                            
-                            # 3. QR
-                            progress_bar.progress((idx * 4 + 3) / (total * 4))
-                            add_log("  📲 Generando código QR...")
-                            qr_link = drive_url or f"https://example.com/qr/{safe_name}"
-                            ok_qr = generate_qr(qr_link, qr_path, size=800, error_correction=qr_ecc[0])
-                            if ok_qr:
-                                add_log("  ✅ Código QR generado")
-                            else:
-                                add_log("  ❌ Error generando QR")
-                                continue
-                                
-                            # 4. Componer PNG
-                            progress_bar.progress((idx * 4 + 4) / (total * 4))
-                            add_log("  🖼️ Componiendo imagen final sobre la plantilla...")
-                            ok_png = compose_bulletin(
-                                template_path=st.session_state.template_path,
-                                output_path=png_path,
-                                student_name=name,
-                                qr_path=qr_path,
-                                name_box={"x": name_x, "y": name_y, "width": name_w, "height": name_h},
-                                qr_box={"x": qr_x, "y": qr_y, "width": qr_w, "height": qr_h},
-                                text_config={
-                                    "font_family": font_family,
-                                    "font_size": font_size,
-                                    "font_bold": font_bold,
-                                    "color": font_color,
-                                    "align": font_align
-                                },
-                                dpi=300
-                            )
-                            if ok_png:
-                                add_log("  ✅ Boletín final PNG generado en alta resolución")
-                                success_count += 1
-                                results.append({"name": name, "png": png_path, "qr_link": qr_link})
-                            else:
-                                add_log("  ❌ Error al componer imagen final")
-                                
-                        except Exception as e:
-                            add_log(f"  💥 Error inesperado: {e}")
-                            traceback.print_exc()
-                            
-                    progress_bar.progress(1.0)
-                    progress_text.text("¡Procesamiento completo!")
-                    
-                     # Generar ZIP consolidado para descarga
-                    zip_download_path = os.path.join(temp_dir, "boletines_procesados.zip")
-                    with zipfile.ZipFile(zip_download_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        for root_dir, _, files in os.walk(out_png):
-                            for file in files:
-                                zipf.write(os.path.join(root_dir, file), os.path.join("Imagenes", file))
-                        for root_dir, _, files in os.walk(out_pdf):
-                            for file in files:
-                                zipf.write(os.path.join(root_dir, file), os.path.join("PDFs", file))
-                                
-                    # Leer el archivo ZIP en memoria para que no desaparezca
-                    with open(zip_download_path, "rb") as f:
-                        st.session_state.processed_zip_data = f.read()
-                        
-                    # Cargar las imágenes finales en memoria en st.session_state
-                    st.session_state.results_gallery = []
-                    for res in results:
-                        try:
-                            img_data = Image.open(res["png"])
-                            img_data.load()  # Forzar carga en memoria
-                            st.session_state.results_gallery.append({
-                                "name": res["name"],
-                                "img": img_data,
-                                "qr_link": res.get("qr_link", "")
-                            })
-                        except Exception:
-                            pass
-                            
-        # Limpieza de temporales al finalizar
-        shutil.rmtree(temp_dir, ignore_errors=True)
- 
-     # Mostrar de forma permanente los resultados si ya han sido procesados
     if st.session_state.processed_zip_data is not None:
+        st.markdown("### 🎉 ¡Procesamiento Completado con Éxito!")
+        st.markdown("Los boletines han sido generados y los códigos QR fueron insertados y vinculados correctamente.")
+        
         st.markdown("---")
         st.markdown("### 📥 Descarga de Boletines Procesados")
-        st.download_button(
-            label="📥 Descargar todos los boletines (.ZIP)",
-            data=st.session_state.processed_zip_data,
-            file_name="boletines_procesados.zip",
-            mime="application/zip",
-            use_container_width=True
-        )
+        
+        col_down, col_reset = st.columns([1, 1])
+        with col_down:
+            st.download_button(
+                label="📥 Descargar todos los boletines (.ZIP)",
+                data=st.session_state.processed_zip_data,
+                file_name="boletines_procesados.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+        with col_reset:
+            if st.button("🔄 REINICIAR PROCESO / NUEVO GRADO", type="primary", use_container_width=True):
+                # Limpiar todo el estado de generación y volver al Paso 1
+                st.session_state.processed_zip_data = None
+                st.session_state.results_gallery = []
+                st.session_state.current_step = 1
+                st.experimental_rerun()
         
         # Mostrar galería de forma permanente con enlaces clicables a los PDFs
         if st.session_state.results_gallery:
@@ -731,8 +563,220 @@ elif step == 4:
                         st.markdown(clickable_html, unsafe_allow_html=True)
                     except Exception as e:
                         st.image(res["img"], caption=res["name"], use_column_width=True)
+    else:
+        st.markdown("### 4️⃣ Paso 4: Subir Boletines PowerPoint y Generar Resultados")
+        st.markdown("Sube las presentaciones de PowerPoint (.pptx) de tus alumnos o un archivo ZIP que contenga todas. ¡El sistema las convertirá en PDF y colocará los QR de forma totalmente automática!")
+        
+        uploaded_files = st.file_uploader(
+            "Sube tus archivos PowerPoint (.pptx) o un archivo .zip que los contenga",
+            type=["pptx", "zip"],
+            accept_multiple_files=True,
+            key="main_pptx_uploader"
+        )
+        
+        if uploaded_files:
+            st.markdown(f"**Archivos cargados:** {len(uploaded_files)}")
+            
+            temp_dir = tempfile.mkdtemp()
+            pptx_files = []
+            
+            for u_file in uploaded_files:
+                if u_file.name.endswith(".zip"):
+                    zip_path = os.path.join(temp_dir, u_file.name)
+                    with open(zip_path, "wb") as f:
+                        f.write(u_file.read())
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    os.unlink(zip_path)
+                else:
+                    dest = os.path.join(temp_dir, u_file.name)
+                    with open(dest, "wb") as f:
+                        f.write(u_file.read())
+            
+            for root, _, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(".pptx") and not file.startswith("~$"):
+                        pptx_files.append(os.path.join(root, file))
+                        
+            if len(pptx_files) == 0:
+                st.error("No se encontraron archivos PowerPoint (.pptx) en la selección.")
+            else:
+                st.success(f"¡Se detectaron {len(pptx_files)} archivos de boletines PowerPoint listos para procesar!")
+                
+                students = []
+                extracted_students = batch_extract_names(pptx_files)
+                
+                with st.expander("✏️ Revisar y Editar Nombres Detectados antes de Iniciar", expanded=True):
+                    st.markdown("<small>Puedes modificar los nombres si la extracción automática no los detectó correctamente.</small>", unsafe_allow_html=True)
+                    for idx, student in enumerate(extracted_students):
+                        col_file, col_name = st.columns([1, 1])
+                        with col_file:
+                            st.text(os.path.basename(student["path"]))
+                        with col_name:
+                            edited_name = st.text_input(
+                                f"Nombre del Estudiante {idx}",
+                                value=student["name"],
+                                key=f"name_{idx}",
+                                label_visibility="collapsed"
+                            )
+                            students.append({"path": student["path"], "name": edited_name})
+                            
+                # Botón de Procesar gigante y visible
+                if st.button("🚀 INICIAR PROCESAMIENTO COMPLETO", use_container_width=True):
+                    if not st.session_state.template_path:
+                        st.error("Falta la imagen de la plantilla. Por favor vuelve al Paso 1.")
+                    else:
+                        st.session_state.processed_zip_data = None
+                        st.session_state.results_gallery = []
+                        
+                        out_dir = tempfile.mkdtemp()
+                        out_pdf = os.path.join(out_dir, "PDF")
+                        out_qr = os.path.join(out_dir, "QR")
+                        out_png = os.path.join(out_dir, "PNG")
+                        os.makedirs(out_pdf, exist_ok=True)
+                        os.makedirs(out_qr, exist_ok=True)
+                        os.makedirs(out_png, exist_ok=True)
+                        
+                        progress_bar = st.progress(0)
+                        progress_text = st.empty()
+                        log_area = st.empty()
+                        log_messages = []
+                        
+                        def add_log(msg: str):
+                            log_messages.append(msg)
+                            log_area.code("\n".join(log_messages))
+                        
+                        add_log(f"Iniciando procesamiento de {len(students)} boletines...")
+                        
+                        uploader = create_uploader(
+                            st.session_state.google_credentials_path,
+                            st.session_state.drive_folder_id_val,
+                            mock=not bool(st.session_state.google_credentials_path)
+                        )
+                        if st.session_state.google_credentials_path:
+                            add_log("☁️ Conectado exitosamente a Google Drive.")
+                        else:
+                            add_log("ℹ️ No se cargaron credenciales de Drive. Los archivos se descargarán directamente en un archivo ZIP.")
+                        
+                        total = len(students)
+                        success_count = 0
+                        results = []
+                        
+                        for idx, student in enumerate(students):
+                            name = student["name"]
+                            pp_path = student["path"]
+                            safe_name = sanitize_filename(name)
+                            
+                            add_log(f"\n▶ [{idx+1}/{total}] {name}")
+                            progress_text.text(f"Procesando {idx+1} de {total}: {name}")
+                            
+                            pdf_path = os.path.join(out_pdf, f"{safe_name}.pdf")
+                            qr_path = os.path.join(out_qr, f"{safe_name}.png")
+                            png_path = os.path.join(out_png, f"{safe_name}.png")
+                            
+                            try:
+                                # 1. PPTX -> PDF
+                                progress_bar.progress((idx * 4 + 1) / (total * 4))
+                                add_log("  📄 Convirtiendo presentación a PDF...")
+                                ok, method = convert_with_fallback(pp_path, pdf_path)
+                                
+                                if ok:
+                                    add_log(f"  ✅ PDF generado usando {method}")
+                                else:
+                                    add_log("  ❌ Error de conversión a PDF")
+                                    continue
+                                    
+                                # 2. Drive
+                                progress_bar.progress((idx * 4 + 2) / (total * 4))
+                                drive_url = ""
+                                if st.session_state.google_credentials_path:
+                                    add_log("  ☁️ Subiendo PDF a Google Drive...")
+                                    drive_url = uploader.upload_pdf(pdf_path, f"{safe_name}.pdf")
+                                    if drive_url:
+                                        add_log(f"  ✅ Subido a Drive: {drive_url[:50]}...")
+                                    else:
+                                        add_log("  ❌ Error subiendo a Google Drive")
+                                
+                                # 3. QR
+                                progress_bar.progress((idx * 4 + 3) / (total * 4))
+                                add_log("  📲 Generando código QR...")
+                                qr_link = drive_url or f"https://example.com/qr/{safe_name}"
+                                ok_qr = generate_qr(qr_link, qr_path, size=800, error_correction=qr_ecc[0])
+                                if ok_qr:
+                                    add_log("  ✅ Código QR generado")
+                                else:
+                                    add_log("  ❌ Error generando QR")
+                                    continue
+                                    
+                                # 4. Componer PNG
+                                progress_bar.progress((idx * 4 + 4) / (total * 4))
+                                add_log("  🖼️ Componiendo imagen final sobre la plantilla...")
+                                ok_png = compose_bulletin(
+                                    template_path=st.session_state.template_path,
+                                    output_path=png_path,
+                                    student_name=name,
+                                    qr_path=qr_path,
+                                    name_box={"x": name_x, "y": name_y, "width": name_w, "height": name_h},
+                                    qr_box={"x": qr_x, "y": qr_y, "width": qr_w, "height": qr_h},
+                                    text_config={
+                                        "font_family": font_family,
+                                        "font_size": font_size,
+                                        "font_bold": font_bold,
+                                        "color": font_color,
+                                        "align": font_align
+                                    },
+                                    dpi=300
+                                )
+                                if ok_png:
+                                    add_log("  ✅ Boletín final PNG generado en alta resolución")
+                                    success_count += 1
+                                    results.append({"name": name, "png": png_path, "qr_link": qr_link})
+                                else:
+                                    add_log("  ❌ Error al componer imagen final")
+                                    
+                            except Exception as e:
+                                add_log(f"  💥 Error inesperado: {e}")
+                                traceback.print_exc()
+                                
+                        progress_bar.progress(1.0)
+                        progress_text.text("¡Procesamiento completo!")
+                        
+                        # Generar ZIP consolidado para descarga
+                        zip_download_path = os.path.join(temp_dir, "boletines_procesados.zip")
+                        with zipfile.ZipFile(zip_download_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                            for root_dir, _, files in os.walk(out_png):
+                                for file in files:
+                                    zipf.write(os.path.join(root_dir, file), os.path.join("Imagenes", file))
+                            for root_dir, _, files in os.walk(out_pdf):
+                                for file in files:
+                                    zipf.write(os.path.join(root_dir, file), os.path.join("PDFs", file))
+                                    
+                        # Leer el archivo ZIP en memoria para que no desaparezca
+                        with open(zip_download_path, "rb") as f:
+                            st.session_state.processed_zip_data = f.read()
+                            
+                        # Cargar las imágenes finales en memoria en st.session_state
+                        st.session_state.results_gallery = []
+                        for res in results:
+                            try:
+                                img_data = Image.open(res["png"])
+                                img_data.load()
+                                st.session_state.results_gallery.append({
+                                    "name": res["name"],
+                                    "img": img_data,
+                                    "qr_link": res.get("qr_link", "")
+                                })
+                            except Exception:
+                                pass
+                                
+                        # Limpieza de temporales al finalizar
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        st.experimental_rerun()
+            
+            # Limpieza de temporales al finalizar si no se inició el procesamiento
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
-    st.markdown("---")
-    if st.button("⬅️ Paso Anterior (Google Drive)", use_container_width=True):
-        st.session_state.current_step = 3
-        st.experimental_rerun()
+        st.markdown("---")
+        if st.button("⬅️ Paso Anterior (Google Drive)", use_container_width=True):
+            st.session_state.current_step = 3
+            st.experimental_rerun()
