@@ -90,12 +90,33 @@ setup_custom_fonts()
 
 
 # Inicializar variables de estado
+# Rutas persistentes de configuración en el servidor
+SAVED_CREDS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_credentials.json")
+SAVED_FOLDER_ID_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_drive_folder_id.txt")
+
+# Inicializar variables de estado
 if "template_image" not in st.session_state:
     st.session_state.template_image = None
 if "template_path" not in st.session_state:
     st.session_state.template_path = ""
+
+# Cargar automáticamente credenciales de Google Drive si ya existen guardadas
 if "google_credentials_path" not in st.session_state:
-    st.session_state.google_credentials_path = ""
+    if os.path.exists(SAVED_CREDS_PATH):
+        st.session_state.google_credentials_path = SAVED_CREDS_PATH
+    else:
+        st.session_state.google_credentials_path = ""
+
+# Cargar automáticamente el Folder ID de Google Drive si ya existe guardado
+if "drive_folder_id_val" not in st.session_state:
+    if os.path.exists(SAVED_FOLDER_ID_PATH):
+        try:
+            with open(SAVED_FOLDER_ID_PATH, "r", encoding="utf-8") as f:
+                st.session_state.drive_folder_id_val = f.read().strip()
+        except Exception:
+            st.session_state.drive_folder_id_val = ""
+    else:
+        st.session_state.drive_folder_id_val = ""
 
 # Inicializar coordenadas en session_state para enlace bidireccional
 if "name_x" not in st.session_state: st.session_state.name_x = 100
@@ -168,15 +189,37 @@ with st.sidebar.expander("📲 Caja del Código QR", expanded=False):
 
 # 3. Google Drive (Opcional)
 with st.sidebar.expander("☁️ Conectar a Google Drive (Opcional)", expanded=False):
-    st.markdown("<small>Si no subes credenciales, el programa generará los archivos en un ZIP descargable.</small>", unsafe_allow_html=True)
-    uploaded_creds = st.file_uploader("Subir Archivo JSON de Credenciales", type=["json"])
-    drive_folder_id = st.text_input("Folder ID de Google Drive", value="")
+    st.markdown("<small>Los datos se guardarán en el servidor para que solo los configures una vez.</small>", unsafe_allow_html=True)
+    
+    # Mostrar estado de credenciales guardadas
+    if os.path.exists(SAVED_CREDS_PATH):
+        st.success("🟢 Credenciales guardadas en el servidor")
+    else:
+        st.info("🟡 Sin credenciales guardadas")
+        
+    uploaded_creds = st.file_uploader("Subir Archivo JSON de Credenciales (Reemplazar)", type=["json"])
     
     if uploaded_creds:
-        cfile = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
-        cfile.write(uploaded_creds.read())
-        cfile.close()
-        st.session_state.google_credentials_path = cfile.name
+        try:
+            # Guardar el archivo JSON de manera permanente en el servidor
+            with open(SAVED_CREDS_PATH, "wb") as f:
+                f.write(uploaded_creds.read())
+            st.session_state.google_credentials_path = SAVED_CREDS_PATH
+            st.success("¡Credenciales guardadas con éxito!")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"Error al guardar credenciales: {e}")
+            
+    drive_folder_id = st.text_input("Folder ID de Google Drive", value=st.session_state.drive_folder_id_val)
+    
+    # Guardar permanentemente el Folder ID si ha cambiado
+    if drive_folder_id != st.session_state.drive_folder_id_val:
+        st.session_state.drive_folder_id_val = drive_folder_id
+        try:
+            with open(SAVED_FOLDER_ID_PATH, "w", encoding="utf-8") as f:
+                f.write(drive_folder_id)
+        except Exception:
+            pass
 
 
 # --- PANEL PRINCIPAL: PESTAÑAS ---
