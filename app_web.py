@@ -129,6 +129,12 @@ if "qr_y" not in st.session_state: st.session_state.qr_y = 100
 if "qr_w" not in st.session_state: st.session_state.qr_w = 250
 if "qr_h" not in st.session_state: st.session_state.qr_h = 250
 
+# Variables de persistencia para descarga y galería en la web
+if "processed_zip_data" not in st.session_state:
+    st.session_state.processed_zip_data = None
+if "results_gallery" not in st.session_state:
+    st.session_state.results_gallery = []
+
 
 # --- HEADER Y LOGO ---
 col_logo, col_title = st.columns([1, 6])
@@ -343,14 +349,11 @@ with tab_preview:
 with tab_process:
     st.markdown("### Procesar Presentaciones PowerPoint (.pptx)")
     
-    uploaded_files = st.file_uploader(
-        "Sube tus archivos PowerPoint (.pptx) o un archivo .zip que los contenga",
-        type=["pptx", "zip"],
-        accept_multiple_files=True
-    )
-    
     if uploaded_files:
         st.markdown(f"**Archivos cargados:** {len(uploaded_files)}")
+        # Limpiar resultados anteriores cuando se suben nuevos archivos
+        st.session_state.processed_zip_data = None
+        st.session_state.results_gallery = []
         
         # Crear entorno temporal para el procesamiento
         temp_dir = tempfile.mkdtemp()
@@ -518,10 +521,7 @@ with tab_process:
                     progress_bar.progress(1.0)
                     progress_text.text("¡Procesamiento completo!")
                     
-                    st.balloons()
-                    st.success(f"¡Procesamiento completado con éxito! {success_count} de {total} boletines generados.")
-                    
-                    # Generar ZIP consolidado para descarga
+                     # Generar ZIP consolidado para descarga
                     zip_download_path = os.path.join(temp_dir, "boletines_procesados.zip")
                     with zipfile.ZipFile(zip_download_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                         # Guardar PNGs
@@ -533,21 +533,38 @@ with tab_process:
                             for file in files:
                                 zipf.write(os.path.join(root_dir, file), os.path.join("PDFs", file))
                                 
+                    # Leer el archivo ZIP en memoria para que no desaparezca
                     with open(zip_download_path, "rb") as f:
-                        st.download_button(
-                            label="📥 Descargar todos los boletines (.ZIP)",
-                            data=f,
-                            file_name="boletines_procesados.zip",
-                            mime="application/zip"
-                        )
+                        st.session_state.processed_zip_data = f.read()
                         
-                    # Mostrar galería en la web
-                    st.markdown("### 🖼️ Galería de Resultados")
-                    cols = st.columns(3)
-                    for i, res in enumerate(results):
-                        with cols[i % 3]:
-                            img_preview = Image.open(res["png"])
-                            st.image(img_preview, caption=res["name"], use_column_width=True)
+                    # Cargar las imágenes finales en memoria en st.session_state
+                    st.session_state.results_gallery = []
+                    for res in results:
+                        try:
+                            img_data = Image.open(res["png"])
+                            img_data.load()  # Forzar carga en memoria
+                            st.session_state.results_gallery.append({"name": res["name"], "img": img_data})
+                        except Exception:
+                            pass
                             
         # Limpieza de temporales al finalizar
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+    # Mostrar de forma permanente los resultados si ya han sido procesados
+    if st.session_state.processed_zip_data is not None:
+        st.markdown("---")
+        st.markdown("### 📥 Descarga de Boletines Procesados")
+        st.download_button(
+            label="📥 Descargar todos los boletines (.ZIP)",
+            data=st.session_state.processed_zip_data,
+            file_name="boletines_procesados.zip",
+            mime="application/zip"
+        )
+        
+        # Mostrar galería de forma permanente
+        if st.session_state.results_gallery:
+            st.markdown("### 🖼️ Galería de Resultados")
+            cols = st.columns(3)
+            for i, res in enumerate(st.session_state.results_gallery):
+                with cols[i % 3]:
+                    st.image(res["img"], caption=res["name"], use_column_width=True)
