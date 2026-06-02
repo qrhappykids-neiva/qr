@@ -154,6 +154,7 @@ def _load_font(family: str, size: int, bold: bool) -> ImageFont.FreeTypeFont:
                     if bold == is_bold_file:
                         path = os.path.join(font_dir, filename)
                         try:
+                            print(f"[FONT_DIAGNOSTIC] Primera pasada cargada: {path} (solicitada: {family}, bold: {bold})")
                             return ImageFont.truetype(path, size)
                         except Exception:
                             pass
@@ -172,6 +173,7 @@ def _load_font(family: str, size: int, bold: bool) -> ImageFont.FreeTypeFont:
                 if family_clean in name_without_ext:
                     path = os.path.join(font_dir, filename)
                     try:
+                        print(f"[FONT_DIAGNOSTIC] Segunda pasada cargada: {path} (solicitada: {family})")
                         return ImageFont.truetype(path, size)
                     except Exception:
                         pass
@@ -184,23 +186,39 @@ def _load_font(family: str, size: int, bold: bool) -> ImageFont.FreeTypeFont:
             path = os.path.join(font_dir, fname)
             if os.path.exists(path):
                 try:
+                    print(f"[FONT_DIAGNOSTIC] Fallback sistema cargada: {path}")
                     return ImageFont.truetype(path, size)
                 except Exception:
                     pass
 
-    # Último recurso absoluto: buscar cualquier archivo .ttf local en el proyecto (ej. BrittanySignature)
+    # Último recurso absoluto: buscar fuentes locales del proyecto priorizando las legibles
+    for folder in local_font_dirs:
+        for name in ["Poppins-Bold.ttf", "Poppins-Regular.ttf"]:
+            path = os.path.join(folder, name)
+            if os.path.exists(path):
+                try:
+                    print(f"[FONT_DIAGNOSTIC] Fallback local Poppins cargada: {path}")
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    pass
+
+    # Si no hay Poppins, cualquier ttf local
     for folder in local_font_dirs:
         if os.path.exists(folder):
             try:
                 for filename in os.listdir(folder):
                     if filename.lower().endswith(".ttf"):
                         path = os.path.join(folder, filename)
-                        logger.info(f"Usando fuente local de respaldo escalable: {path}")
-                        return ImageFont.truetype(path, size)
+                        try:
+                            print(f"[FONT_DIAGNOSTIC] Fallback local general cargada: {path}")
+                            return ImageFont.truetype(path, size)
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
     # Si todo falla, usar el default (no escalable, pero evita caída del programa)
+    print("[FONT_DIAGNOSTIC] Fallback default Pillow (no es escalable)")
     logger.warning(f"Fuente '{family}' no encontrada y no hay fuentes locales válidas. Usando fuente por defecto de Pillow.")
     return ImageFont.load_default()
 

@@ -13,6 +13,27 @@ from streamlit_drawable_canvas import st_canvas
 # Asegurar que el directorio raíz esté en el path de Python
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+def download_fonts_on_startup():
+    """Descarga las fuentes de Poppins si no están presentes localmente."""
+    fonts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+    os.makedirs(fonts_dir, exist_ok=True)
+    poppins_bold = os.path.join(fonts_dir, "Poppins-Bold.ttf")
+    poppins_regular = os.path.join(fonts_dir, "Poppins-Regular.ttf")
+    
+    import urllib.request
+    if not os.path.exists(poppins_bold):
+        try:
+            urllib.request.urlretrieve('https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf', poppins_bold)
+        except Exception:
+            pass
+    if not os.path.exists(poppins_regular):
+        try:
+            urllib.request.urlretrieve('https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Regular.ttf', poppins_regular)
+        except Exception:
+            pass
+
+download_fonts_on_startup()
+
 from core.qr_generator import generate_qr
 from core.image_composer import compose_bulletin
 from core.pdf_converter import convert_with_fallback
@@ -217,7 +238,7 @@ st.sidebar.markdown("### 🎨 Personalizar Diseño")
 
 # Estilo de Letra (Nombre)
 with st.sidebar.expander("👤 Estilo del Nombre", expanded=True):
-    font_family = st.selectbox("Tipografía", ["Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman", "Brittany Signature"])
+    font_family = st.selectbox("Tipografía", ["Poppins", "Arial", "Courier New", "Liberation Sans", "Georgia", "Comic Sans MS", "Times New Roman", "Brittany Signature"])
     font_size = st.slider("Tamaño de letra", min_value=10, max_value=250, value=80)
     font_bold = st.checkbox("Texto en Negrita (Bold)", value=True)
     font_color = st.color_picker("Color de letra", value="#000000")
